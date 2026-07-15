@@ -1,6 +1,39 @@
 import type { Role, Permission } from '../types';
+import apiClient from './client';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+interface BackendPermission { id: string; resource: string; action: string; name: string }
+interface BackendRole { id: string; name: string; description: string; permissions?: BackendPermission[]; created_at: string }
+
+const ROLE_COLORS: Record<string, string> = {
+  admin: '#EF4444', analyst: '#3B82F6', viewer: '#94A3B8', operator: '#10B981', auditor: '#F59E0B',
+};
+
+function mapBackendRole(r: BackendRole): Role {
+  return {
+    id: r.id,
+    name: r.name,
+    displayName: r.name.charAt(0).toUpperCase() + r.name.slice(1),
+    description: r.description,
+    permissions: (r.permissions ?? []).map(p => `${p.action}:${p.resource}`),
+    userCount: 0,
+    color: ROLE_COLORS[r.name] ?? '#64748B',
+    createdAt: r.created_at,
+  };
+}
+function mapBackendPermission(p: BackendPermission): Permission {
+  return {
+    id: p.id,
+    key: `${p.action}:${p.resource}`,
+    name: p.name,
+    description: p.name,
+    category: p.resource.charAt(0).toUpperCase() + p.resource.slice(1),
+  };
+}
+async function unwrap<T>(p: Promise<{ data: { data: T } }>): Promise<T> {
+  return (await p).data.data;
+}
 
 export const MOCK_PERMISSIONS: Permission[] = [
   { id: 'p-001', key: 'read:entities', name: 'Read Entities', description: 'View entity records', category: 'Entities' },
@@ -78,31 +111,48 @@ export const MOCK_ROLES: Role[] = [
 
 export const rolesApi = {
   getRoles: async (): Promise<Role[]> => {
-    await delay(400);
-    return MOCK_ROLES;
+    try {
+      const data = await unwrap<BackendRole[]>(apiClient.get('/v1/roles'));
+      if (!data?.length) return MOCK_ROLES;
+      return data.map(mapBackendRole);
+    } catch {
+      return MOCK_ROLES;
+    }
   },
 
   getRole: async (id: string): Promise<Role> => {
-    await delay(300);
+    await delay(200);
     const role = MOCK_ROLES.find(r => r.id === id);
     if (!role) throw new Error('Role not found');
     return role;
   },
 
   getPermissions: async (): Promise<Permission[]> => {
-    await delay(300);
-    return MOCK_PERMISSIONS;
+    try {
+      const data = await unwrap<BackendPermission[]>(apiClient.get('/v1/permissions'));
+      if (!data?.length) return MOCK_PERMISSIONS;
+      return data.map(mapBackendPermission);
+    } catch {
+      return MOCK_PERMISSIONS;
+    }
   },
 
   createRole: async (data: Partial<Role>): Promise<Role> => {
-    await delay(500);
-    return {
-      ...data,
-      id: 'role-' + Date.now(),
-      userCount: 0,
-      createdAt: new Date().toISOString(),
-      permissions: data.permissions || [],
-    } as Role;
+    try {
+      const created = await unwrap<BackendRole>(
+        apiClient.post('/v1/roles', { name: data.name, description: data.description })
+      );
+      return { ...mapBackendRole(created), permissions: data.permissions || [] };
+    } catch {
+      await delay(300);
+      return {
+        ...data,
+        id: 'role-' + Date.now(),
+        userCount: 0,
+        createdAt: new Date().toISOString(),
+        permissions: data.permissions || [],
+      } as Role;
+    }
   },
 
   updateRole: async (id: string, data: Partial<Role>): Promise<Role> => {

@@ -1,6 +1,19 @@
 import type { ServiceStatus, MetricPoint, AlertRule, DataSource } from '../types';
+import apiClient from './client';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+interface BackendService { name: string; status: string }
+
+function mapBackendStatus(s: string): ServiceStatus['status'] {
+  if (s === 'up') return 'healthy';
+  if (s === 'degraded') return 'degraded';
+  if (s === 'down') return 'down';
+  return 'unknown';
+}
+async function unwrap<T>(p: Promise<{ data: { data: T } }>): Promise<T> {
+  return (await p).data.data;
+}
 
 export const MOCK_SERVICES: ServiceStatus[] = [
   { id: 'svc-001', name: 'API Gateway', status: 'healthy', uptime: 99.98, responseTime: 12, version: '3.2.1', lastCheck: new Date().toISOString() },
@@ -42,8 +55,22 @@ const generateMetricPoints = (baseValue: number, variance: number, count: number
 
 export const monitoringApi = {
   getServices: async (): Promise<ServiceStatus[]> => {
-    await delay(300);
-    return MOCK_SERVICES;
+    try {
+      const data = await unwrap<BackendService[]>(apiClient.get('/v1/monitoring/services'));
+      if (!data?.length) return MOCK_SERVICES;
+      // Backend reports name+status; enrich with presentational defaults.
+      return data.map((svc, i) => ({
+        id: `svc-${i + 1}`,
+        name: svc.name,
+        status: mapBackendStatus(svc.status),
+        uptime: MOCK_SERVICES[i]?.uptime ?? 99.9,
+        responseTime: MOCK_SERVICES[i]?.responseTime ?? 15,
+        version: MOCK_SERVICES[i]?.version ?? '1.0.0',
+        lastCheck: new Date().toISOString(),
+      }));
+    } catch {
+      return MOCK_SERVICES;
+    }
   },
 
   getMetrics: async () => {

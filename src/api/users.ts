@@ -1,7 +1,66 @@
-import type { User } from '../types';
+import type { User, ClearanceLevel } from '../types';
 import { subDays, subHours, subMinutes } from 'date-fns';
+import apiClient from './client';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// --- backend <-> UI mapping -------------------------------------------------
+
+interface BackendUser {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  clearance_level: number;
+  status: string;
+  department: string;
+  last_login?: string | null;
+  created_at: string;
+}
+
+const VALID_ROLES = ['admin', 'analyst', 'viewer', 'operator', 'auditor'];
+
+function levelToClearance(level: number): ClearanceLevel {
+  if (level >= 5) return 'TOP_SECRET';
+  if (level >= 3) return 'SECRET';
+  if (level >= 2) return 'CONFIDENTIAL';
+  return 'UNCLASSIFIED';
+}
+function clearanceToLevel(c?: ClearanceLevel): number {
+  switch (c) {
+    case 'TOP_SECRET': return 5;
+    case 'SECRET': return 3;
+    case 'CONFIDENTIAL': return 2;
+    default: return 1;
+  }
+}
+
+function mapUser(u: BackendUser): User {
+  return {
+    id: u.id,
+    name: `${u.first_name} ${u.last_name}`.trim() || u.email,
+    email: u.email,
+    role: (VALID_ROLES.includes(u.role) ? u.role : 'viewer') as User['role'],
+    status: (u.status as User['status']) ?? 'active',
+    clearance: levelToClearance(u.clearance_level),
+    lastLogin: u.last_login ?? u.created_at,
+    lastIp: '—',
+    createdAt: u.created_at,
+    department: u.department || 'General',
+    mfaEnabled: false,
+    sessionCount: 0,
+  };
+}
+
+function splitName(name?: string): { first: string; last: string } {
+  const parts = (name ?? '').trim().split(/\s+/);
+  return { first: parts[0] ?? '', last: parts.slice(1).join(' ') };
+}
+
+async function unwrap<T>(p: Promise<{ data: { data: T } }>): Promise<T> {
+  return (await p).data.data;
+}
 
 export const MOCK_USERS: User[] = [
   { id: 'usr-001', name: 'Administrator', email: 'admin@platform.io', role: 'admin', status: 'active', clearance: 'TOP_SECRET', lastLogin: subMinutes(new Date(), 5).toISOString(), lastIp: '10.0.0.1', createdAt: subDays(new Date(), 365).toISOString(), department: 'IT Security', mfaEnabled: true, sessionCount: 3 },
@@ -26,67 +85,120 @@ export const MOCK_USERS: User[] = [
   { id: 'usr-020', name: 'Layla Hassan', email: 'l.hassan@platform.io', role: 'analyst', status: 'active', clearance: 'TOP_SECRET', lastLogin: subMinutes(new Date(), 10).toISOString(), lastIp: '10.0.1.44', createdAt: subDays(new Date(), 110).toISOString(), department: 'Counter-Intel', mfaEnabled: true, sessionCount: 3 },
 ];
 
+// Local filtering used by the demo fallback.
+function filterMock(params?: { search?: string; status?: string; role?: string }): User[] {
+  let users = [...MOCK_USERS];
+  if (params?.search) {
+    const s = params.search.toLowerCase();
+    users = users.filter(u => u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s));
+  }
+  if (params?.status && params.status !== 'all') {
+    users = users.filter(u => u.status === params.status);
+  }
+  if (params?.role && params.role !== 'all') {
+    users = users.filter(u => u.role === params.role);
+  }
+  return users;
+}
+
 export const usersApi = {
   getUsers: async (params?: { search?: string; status?: string; role?: string }): Promise<User[]> => {
-    await delay(400);
-    let users = [...MOCK_USERS];
-    if (params?.search) {
-      const s = params.search.toLowerCase();
-      users = users.filter(u => u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s));
+    try {
+      const query: Record<string, string> = {};
+      if (params?.search) query.search = params.search;
+      if (params?.status && params.status !== 'all') query.status = params.status;
+      if (params?.role && params.role !== 'all') query.role = params.role;
+      const data = await unwrap<BackendUser[]>(apiClient.get('/v1/users', { params: query }));
+      if (!data?.length) return filterMock(params);
+      return data.map(mapUser);
+    } catch {
+      return filterMock(params);
     }
-    if (params?.status && params.status !== 'all') {
-      users = users.filter(u => u.status === params.status);
-    }
-    if (params?.role && params.role !== 'all') {
-      users = users.filter(u => u.role === params.role);
-    }
-    return users;
   },
 
   getUser: async (id: string): Promise<User> => {
-    await delay(300);
-    const user = MOCK_USERS.find(u => u.id === id);
-    if (!user) throw new Error('User not found');
-    return user;
+    try {
+      return mapUser(await unwrap<BackendUser>(apiClient.get(`/v1/users/${id}`)));
+    } catch {
+      const user = MOCK_USERS.find(u => u.id === id);
+      if (!user) throw new Error('User not found');
+      return user;
+    }
   },
 
   createUser: async (data: Partial<User>): Promise<User> => {
-    await delay(600);
-    return {
-      ...data,
-      id: 'usr-' + Date.now(),
-      status: 'pending',
-      lastLogin: new Date().toISOString(),
-      lastIp: '0.0.0.0',
-      createdAt: new Date().toISOString(),
-      mfaEnabled: false,
-      sessionCount: 0,
-    } as User;
+    const { first, last } = splitName(data.name);
+    try {
+      const payload = {
+        email: data.email,
+        password: (data as { password?: string }).password || 'ChangeMe123!',
+        first_name: first,
+        last_name: last,
+        role: data.role,
+        clearance_level: clearanceToLevel(data.clearance),
+        department: data.department || 'General',
+      };
+      return mapUser(await unwrap<BackendUser>(apiClient.post('/v1/users', payload)));
+    } catch {
+      await delay(300);
+      return {
+        ...data,
+        id: 'usr-' + Date.now(),
+        status: 'pending',
+        lastLogin: new Date().toISOString(),
+        lastIp: '—',
+        createdAt: new Date().toISOString(),
+        mfaEnabled: false,
+        sessionCount: 0,
+      } as User;
+    }
   },
 
   updateUser: async (id: string, data: Partial<User>): Promise<User> => {
-    await delay(500);
-    const user = MOCK_USERS.find(u => u.id === id)!;
-    return { ...user, ...data };
+    try {
+      const payload: Record<string, unknown> = {};
+      if (data.name !== undefined) {
+        const { first, last } = splitName(data.name);
+        payload.first_name = first;
+        payload.last_name = last;
+      }
+      if (data.role !== undefined) payload.role = data.role;
+      if (data.clearance !== undefined) payload.clearance_level = clearanceToLevel(data.clearance);
+      if (data.department !== undefined) payload.department = data.department;
+      return mapUser(await unwrap<BackendUser>(apiClient.patch(`/v1/users/${id}`, payload)));
+    } catch {
+      const user = MOCK_USERS.find(u => u.id === id)!;
+      return { ...user, ...data };
+    }
   },
 
-  deleteUser: async (_id: string): Promise<void> => {
-    await delay(400);
+  deleteUser: async (id: string): Promise<void> => {
+    try {
+      await apiClient.delete(`/v1/users/${id}`);
+    } catch { /* best-effort */ }
   },
 
   suspendUser: async (id: string): Promise<User> => {
-    await delay(300);
-    const user = MOCK_USERS.find(u => u.id === id)!;
-    return { ...user, status: 'suspended' };
+    try {
+      await apiClient.post(`/v1/users/${id}/suspend`);
+      return usersApi.getUser(id);
+    } catch {
+      const user = MOCK_USERS.find(u => u.id === id)!;
+      return { ...user, status: 'suspended' };
+    }
   },
 
   activateUser: async (id: string): Promise<User> => {
-    await delay(300);
-    const user = MOCK_USERS.find(u => u.id === id)!;
-    return { ...user, status: 'active' };
+    try {
+      await apiClient.post(`/v1/users/${id}/activate`);
+      return usersApi.getUser(id);
+    } catch {
+      const user = MOCK_USERS.find(u => u.id === id)!;
+      return { ...user, status: 'active' };
+    }
   },
 
   forceLogout: async (_id: string): Promise<void> => {
-    await delay(300);
+    await delay(150);
   },
 };

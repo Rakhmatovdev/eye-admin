@@ -1,4 +1,5 @@
 import { subDays, subHours, subMinutes } from 'date-fns';
+import apiClient from './client';
 import type {
   SecurityIncident,
   Vulnerability,
@@ -514,73 +515,188 @@ export const severityColor = (severity: string) => SEVERITY_COLOR[severity] ?? '
 // Public API — real backend calls when reachable, seeded demo data otherwise
 // ---------------------------------------------------------------------------
 
+// --- backend <-> UI mappers -------------------------------------------------
+
+interface BackendIncident {
+  id: string; type: string; severity: string; status: string;
+  title: string; description: string; source_ip: string;
+  affected_assets: string[] | null; tlp: string; assignee?: string | null; timestamp: string;
+}
+interface BackendVuln {
+  id: string; cve_id?: string | null; title: string; severity: string; cvss_score: number;
+  status: string; affected_asset: string; component: string; description: string;
+  remediation: string; discovered_at: string;
+}
+interface BackendBlocklist {
+  id: string; value: string; type: string; reason: string; hit_count: number;
+  added_by: string; expires_at?: string | null; created_at: string;
+}
+
+function mapIncident(i: BackendIncident): SecurityIncident {
+  return {
+    id: i.id,
+    title: i.title,
+    type: i.type as SecurityIncident['type'],
+    severity: i.severity as SecurityIncident['severity'],
+    status: i.status as SecurityIncident['status'],
+    timestamp: i.timestamp,
+    sourceIp: i.source_ip,
+    affectedAssets: i.affected_assets ?? [],
+    description: i.description,
+    assignee: i.assignee ?? undefined,
+    tlp: (i.tlp as SecurityIncident['tlp']) ?? 'AMBER',
+  };
+}
+function mapVuln(v: BackendVuln): Vulnerability {
+  return {
+    id: v.id,
+    cveId: v.cve_id ?? undefined,
+    title: v.title,
+    severity: v.severity as Vulnerability['severity'],
+    cvssScore: v.cvss_score,
+    status: v.status as Vulnerability['status'],
+    affectedAsset: v.affected_asset,
+    component: v.component,
+    discoveredAt: v.discovered_at,
+    description: v.description,
+    remediation: v.remediation,
+  };
+}
+function mapBlocklist(b: BackendBlocklist): BlocklistEntry {
+  return {
+    id: b.id,
+    value: b.value,
+    type: b.type as BlocklistEntry['type'],
+    reason: b.reason,
+    addedBy: b.added_by,
+    addedAt: b.created_at,
+    expiresAt: b.expires_at ?? undefined,
+    hitCount: b.hit_count,
+  };
+}
+
+async function unwrap<T>(p: Promise<{ data: { data: T } }>): Promise<T> {
+  return (await p).data.data;
+}
+
+// Fetch helpers: real backend, falling back to seeded demo data on any error.
+async function fetchIncidents(): Promise<SecurityIncident[]> {
+  try {
+    const data = await unwrap<BackendIncident[]>(apiClient.get('/v1/security/incidents'));
+    if (!data?.length) return MOCK_INCIDENTS;
+    return data.map(mapIncident);
+  } catch {
+    return MOCK_INCIDENTS;
+  }
+}
+async function fetchVulnerabilities(): Promise<Vulnerability[]> {
+  try {
+    const data = await unwrap<BackendVuln[]>(apiClient.get('/v1/security/vulnerabilities'));
+    if (!data?.length) return MOCK_VULNERABILITIES;
+    return data.map(mapVuln);
+  } catch {
+    return MOCK_VULNERABILITIES;
+  }
+}
+async function fetchBlocklist(): Promise<BlocklistEntry[]> {
+  try {
+    const data = await unwrap<BackendBlocklist[]>(apiClient.get('/v1/security/blocklist'));
+    if (!data?.length) return MOCK_BLOCKLIST;
+    return data.map(mapBlocklist);
+  } catch {
+    return MOCK_BLOCKLIST;
+  }
+}
+
 export const securityApi = {
   async getOverview(): Promise<SecurityOverview> {
-    await delay(250);
-    return computeOverview(MOCK_INCIDENTS, MOCK_VULNERABILITIES, MOCK_BLOCKLIST);
+    const [incidents, vulns, blocklist] = await Promise.all([
+      fetchIncidents(),
+      fetchVulnerabilities(),
+      fetchBlocklist(),
+    ]);
+    return computeOverview(incidents, vulns, blocklist);
   },
 
   async listIncidents(): Promise<SecurityIncident[]> {
-    await delay(300);
-    return [...MOCK_INCIDENTS].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    const incidents = await fetchIncidents();
+    return incidents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   },
 
   async resolveIncident(id: string): Promise<SecurityIncident> {
-    await delay(300);
+    try {
+      await apiClient.post(`/v1/security/incidents/${id}/resolve`);
+    } catch { /* fall through to local update */ }
     MOCK_INCIDENTS = MOCK_INCIDENTS.map((i) => (i.id === id ? { ...i, status: 'resolved' } : i));
-    return MOCK_INCIDENTS.find((i) => i.id === id)!;
+    return MOCK_INCIDENTS.find((i) => i.id === id) ?? { ...MOCK_INCIDENTS[0], id, status: 'resolved' };
   },
 
   async updateIncidentStatus(id: string, status: SecurityIncident['status']): Promise<SecurityIncident> {
-    await delay(250);
+    try {
+      await apiClient.patch(`/v1/security/incidents/${id}/status`, { status });
+    } catch { /* fall through */ }
     MOCK_INCIDENTS = MOCK_INCIDENTS.map((i) => (i.id === id ? { ...i, status } : i));
-    return MOCK_INCIDENTS.find((i) => i.id === id)!;
+    return MOCK_INCIDENTS.find((i) => i.id === id) ?? { ...MOCK_INCIDENTS[0], id, status };
   },
 
   async assignIncident(id: string, assignee: string): Promise<SecurityIncident> {
-    await delay(200);
+    try {
+      await apiClient.post(`/v1/security/incidents/${id}/assign`, { assignee });
+    } catch { /* fall through */ }
     MOCK_INCIDENTS = MOCK_INCIDENTS.map((i) => (i.id === id ? { ...i, assignee } : i));
-    return MOCK_INCIDENTS.find((i) => i.id === id)!;
+    return MOCK_INCIDENTS.find((i) => i.id === id) ?? { ...MOCK_INCIDENTS[0], id, assignee };
   },
 
   async listVulnerabilities(): Promise<Vulnerability[]> {
-    await delay(300);
-    return [...MOCK_VULNERABILITIES].sort((a, b) => b.cvssScore - a.cvssScore);
+    const vulns = await fetchVulnerabilities();
+    return vulns.sort((a, b) => b.cvssScore - a.cvssScore);
   },
 
   async updateVulnerabilityStatus(id: string, status: Vulnerability['status']): Promise<Vulnerability> {
-    await delay(250);
-    MOCK_VULNERABILITIES = MOCK_VULNERABILITIES.map((v) => (v.id === id ? { ...v, status } : v));
-    return MOCK_VULNERABILITIES.find((v) => v.id === id)!;
+    try {
+      const data = await unwrap<BackendVuln>(apiClient.patch(`/v1/security/vulnerabilities/${id}`, { status }));
+      return mapVuln(data);
+    } catch {
+      MOCK_VULNERABILITIES = MOCK_VULNERABILITIES.map((v) => (v.id === id ? { ...v, status } : v));
+      return MOCK_VULNERABILITIES.find((v) => v.id === id) ?? { ...MOCK_VULNERABILITIES[0], id, status };
+    }
   },
 
   async listBlocklist(): Promise<BlocklistEntry[]> {
-    await delay(250);
-    return [...MOCK_BLOCKLIST].sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+    const blocklist = await fetchBlocklist();
+    return blocklist.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
   },
 
   async addToBlocklist(value: string, type: BlocklistEntry['type'], reason: string): Promise<BlocklistEntry> {
-    await delay(350);
-    const entry: BlocklistEntry = {
-      id: `blk-${Date.now()}`,
-      value,
-      type,
-      reason: reason || 'Manually added by administrator',
-      addedBy: 'You',
-      addedAt: new Date().toISOString(),
-      hitCount: 0,
-    };
-    MOCK_BLOCKLIST = [entry, ...MOCK_BLOCKLIST];
-    return entry;
+    try {
+      const data = await unwrap<BackendBlocklist>(
+        apiClient.post('/v1/security/blocklist', { value, type, reason: reason || 'Manually added by administrator' })
+      );
+      return mapBlocklist(data);
+    } catch {
+      const entry: BlocklistEntry = {
+        id: `blk-${Date.now()}`,
+        value,
+        type,
+        reason: reason || 'Manually added by administrator',
+        addedBy: 'You',
+        addedAt: new Date().toISOString(),
+        hitCount: 0,
+      };
+      MOCK_BLOCKLIST = [entry, ...MOCK_BLOCKLIST];
+      return entry;
+    }
   },
 
   async removeFromBlocklist(id: string): Promise<void> {
-    await delay(250);
+    try {
+      await apiClient.delete(`/v1/security/blocklist/${id}`);
+    } catch { /* fall through */ }
     MOCK_BLOCKLIST = MOCK_BLOCKLIST.filter((b) => b.id !== id);
   },
 
   async getAttackMap(): Promise<AttackMapNode[]> {
-    await delay(300);
-    return computeAttackMap(MOCK_INCIDENTS);
+    const incidents = await fetchIncidents();
+    return computeAttackMap(incidents);
   },
 };
