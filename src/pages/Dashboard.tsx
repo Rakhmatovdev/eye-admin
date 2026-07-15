@@ -1,0 +1,215 @@
+import React from 'react';
+import { 
+  Users, 
+  ShieldAlert, 
+  Layers, 
+  Activity, 
+  ArrowUpRight, 
+  ArrowDownRight,
+  TrendingUp
+} from 'lucide-react';
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts';
+
+export const Dashboard: React.FC = () => {
+  // Mock Stats Data
+  const stats = [
+    { name: 'Total Users', value: '1,248', icon: Users, trend: '+12%', up: true, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { name: 'Active Sessions', value: '84', icon: Activity, trend: '+4%', up: true, color: 'text-green-500', bg: 'bg-green-500/10' },
+    { name: 'Mapped Entities', value: '142.8K', icon: Layers, trend: '+28%', up: true, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+    { name: 'Threat Alerts', value: '3', icon: ShieldAlert, trend: '-18%', up: false, color: 'text-red-500', bg: 'bg-red-500/10' },
+  ];
+
+  // Mock Traffic Data
+  const trafficData = [
+    { time: '00:00', requests: 1200, errors: 12 },
+    { time: '04:00', requests: 800, errors: 4 },
+    { time: '08:00', requests: 2400, errors: 45 },
+    { time: '12:00', requests: 3800, errors: 98 },
+    { time: '16:00', requests: 3100, errors: 52 },
+    { time: '20:00', requests: 1900, errors: 22 },
+  ];
+
+  // Mock Entity Distribution Data
+  const entityData = [
+    { name: 'Person', value: 4500, color: '#3B82F6' },
+    { name: 'Organization', value: 1200, color: '#10B981' },
+    { name: 'Location', value: 850, color: '#F59E0B' },
+    { name: 'Phone', value: 2400, color: '#06B6D4' },
+    { name: 'Vehicle', value: 650, color: '#EF4444' },
+  ];
+
+  const recentIncidents = [
+    { id: '1', title: 'Brute Force Attempt', status: 'Blocked', severity: 'High', time: '12m ago', target: 'admin@platform.io' },
+    { id: '2', title: 'Impossible Travel Anomaly', status: 'Investigating', severity: 'Medium', time: '42m ago', target: 'analyst@platform.io' },
+    { id: '3', title: 'Suspicious Bulk File Access', status: 'Mitigated', severity: 'Critical', time: '2h ago', target: 'viewer@platform.io' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Welcome Banner */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-gradient-to-r from-gray-900 to-slate-900 border border-gray-800 rounded-2xl relative overflow-hidden">
+        <div className="absolute right-0 top-0 w-96 h-96 bg-blue-600/5 rounded-full blur-3xl" />
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+            System Operations Dashboard <span className="live-dot w-2.5 h-2.5 bg-green-500 rounded-full inline-block" />
+          </h1>
+          <p className="text-gray-400 text-sm mt-1">Real-time status overview of nodes, telemetry, security threats and user access logs.</p>
+        </div>
+        <div className="flex items-center gap-2 bg-gray-800/80 px-4 py-2 rounded-xl border border-gray-700/50">
+          <TrendingUp size={16} className="text-blue-400" />
+          <span className="text-xs font-semibold text-gray-300">All Nodes Operational</span>
+        </div>
+      </div>
+
+      {/* Grid Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((stat, idx) => {
+          const Icon = stat.icon;
+          return (
+            <div key={idx} className="glass p-5 rounded-2xl border border-gray-800 flex items-center justify-between card-hover">
+              <div className="space-y-1">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{stat.name}</span>
+                <h3 className="text-3xl font-extrabold text-white">{stat.value}</h3>
+                <div className="flex items-center gap-1.5 mt-2">
+                  {stat.up ? (
+                    <ArrowUpRight size={14} className="text-green-500" />
+                  ) : (
+                    <ArrowDownRight size={14} className="text-red-500" />
+                  )}
+                  <span className={`text-xs font-bold ${stat.up ? 'text-green-500' : 'text-red-500'}`}>{stat.trend}</span>
+                  <span className="text-xxs text-gray-500 font-medium">vs last month</span>
+                </div>
+              </div>
+              <div className={`w-12 h-12 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center border border-gray-800`}>
+                <Icon size={22} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Chart Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 glass p-5 rounded-2xl border border-gray-800">
+          <h4 className="text-base font-bold text-white mb-4">Operations Traffic (API Load)</h4>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trafficData}>
+                <defs>
+                  <linearGradient id="requestsGlow" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="time" />
+                <YAxis />
+                <Tooltip />
+                <Area type="monotone" dataKey="requests" stroke="#3B82F6" fillOpacity={1} fill="url(#requestsGlow)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="glass p-5 rounded-2xl border border-gray-800 flex flex-col justify-between">
+          <div>
+            <h4 className="text-base font-bold text-white mb-4">Ontology Node Classes</h4>
+            <div className="h-60 flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={entityData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {entityData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-4">
+            {entityData.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-xs">
+                <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: item.color }} />
+                <span className="text-gray-400">{item.name} ({item.value})</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Underworld / Lower Sections */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Recent Incidents */}
+        <div className="glass p-5 rounded-2xl border border-gray-800">
+          <h4 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+            Threat & Alert Indicators <span className="live-dot-red w-2 h-2 bg-red-500 rounded-full" />
+          </h4>
+          <div className="divide-y divide-gray-800 space-y-3">
+            {recentIncidents.map(inc => (
+              <div key={inc.id} className="pt-3 flex items-center justify-between text-sm">
+                <div>
+                  <h5 className="font-semibold text-gray-200">{inc.title}</h5>
+                  <p className="text-xs text-gray-500">Target: {inc.target} • {inc.time}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2.5 py-0.5 rounded-full text-xxs font-bold ${
+                    inc.severity === 'Critical' ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
+                    inc.severity === 'High' ? 'bg-orange-500/10 text-orange-500 border border-orange-500/20' :
+                    'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20'
+                  }`}>
+                    {inc.severity}
+                  </span>
+                  <span className="text-xs text-gray-400 font-medium">{inc.status}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* System Node Telemetry */}
+        <div className="glass p-5 rounded-2xl border border-gray-800">
+          <h4 className="text-base font-bold text-white mb-4">Core Node Services</h4>
+          <div className="space-y-3.5">
+            {[
+              { name: 'PostgreSQL Relational DB', status: 'Healthy', ping: '12ms' },
+              { name: 'Redis Token Store', status: 'Healthy', ping: '2ms' },
+              { name: 'WebSocket Real-time Broadcast', status: 'Healthy', ping: '1ms' },
+              { name: 'mTLS Remote Agent Connector', status: 'Slight Lag', ping: '180ms', lag: true },
+            ].map((node, idx) => (
+              <div key={idx} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2.5">
+                  <span className={`w-2.5 h-2.5 rounded-full ${node.lag ? 'live-dot-amber bg-amber-500' : 'live-dot bg-green-500'}`} />
+                  <span className="font-medium text-gray-300">{node.name}</span>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold text-gray-400">{node.status}</p>
+                  <p className="text-xxs text-gray-500">{node.ping}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
