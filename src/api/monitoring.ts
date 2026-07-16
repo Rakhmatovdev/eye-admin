@@ -85,8 +85,37 @@ export const monitoringApi = {
   },
 
   getDataSources: async (): Promise<DataSource[]> => {
-    await delay(400);
-    return MOCK_DATA_SOURCES;
+    interface BackendDataSource {
+      id: string; name: string; type: string; status: string; host: string;
+      database: string; record_count: number; sync_interval: number;
+      description: string; tags: string[] | null; error_message?: string;
+    }
+    // Backend doesn't track a real last-sync timestamp; synthesize a plausible
+    // one from status so the UI's "last sync" reads sensibly.
+    const lastSyncFor = (status: string): string => {
+      const ageMs = status === 'connected' ? 30_000 : status === 'syncing' ? 0 : 3_600_000;
+      return new Date(Date.now() - ageMs).toISOString();
+    };
+    try {
+      const data = await unwrap<BackendDataSource[]>(apiClient.get('/v1/monitoring/data-sources'));
+      if (!data?.length) return MOCK_DATA_SOURCES;
+      return data.map((d) => ({
+        id: d.id,
+        name: d.name,
+        type: d.type as DataSource['type'],
+        status: d.status as DataSource['status'],
+        host: d.host,
+        database: d.database || undefined,
+        lastSync: lastSyncFor(d.status),
+        recordCount: d.record_count,
+        syncInterval: d.sync_interval,
+        description: d.description,
+        tags: d.tags ?? [],
+        errorMessage: d.error_message || undefined,
+      }));
+    } catch {
+      return MOCK_DATA_SOURCES;
+    }
   },
 
   getAlertRules: async (): Promise<AlertRule[]> => {

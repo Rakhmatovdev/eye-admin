@@ -1,22 +1,35 @@
 import React, { useState } from 'react';
-import { Database, Plus, RefreshCw, CheckCircle, AlertCircle, Play } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Database, Plus, RefreshCw, CheckCircle, AlertCircle, XCircle, Play } from 'lucide-react';
+import { monitoringApi } from '../api/monitoring';
+import type { DataSource } from '../types';
+
+function formatRecords(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+function timeAgo(iso: string): string {
+  const s = Math.floor((Date.now() - +new Date(iso)) / 1000);
+  if (s < 5) return 'Active now';
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
 
 export const DataSources: React.FC = () => {
-  const [sources, setSources] = useState([
-    { id: '1', name: 'Postgres Core Ingest', type: 'postgresql', status: 'connected', host: '10.0.4.15:5432', database: 'prod_intel_db', lastSync: '3m ago', records: '1.2M' },
-    { id: '2', name: 'Border Crossing Kafka Feed', type: 'kafka', status: 'syncing', host: 'kafka-broker-01:9092', database: 'customs.telemetry', lastSync: 'Active Now', records: '48.2M' },
-    { id: '3', name: 'Static Registry S3 Bucket', type: 's3', status: 'connected', host: 's3.us-east-1.amazonaws.com', database: 'static-persons-vault', lastSync: '1d ago', records: '240K' },
-    { id: '4', name: 'Customs CSV Logs Ingestion', type: 'csv', status: 'warning', host: 'Manual File Import', database: 'border_logs_2026.csv', lastSync: '3d ago', records: '8.4K', error: 'Incomplete columns parsed' },
-  ]);
-
+  const qc = useQueryClient();
+  const { data: sources = [] } = useQuery({ queryKey: ['data-sources'], queryFn: monitoringApi.getDataSources });
   const [syncingId, setSyncingId] = useState<string | null>(null);
 
   const handleManualSync = (id: string) => {
     setSyncingId(id);
+    // Simulated re-sync: refetch the live list, then clear the spinner.
     setTimeout(() => {
+      qc.invalidateQueries({ queryKey: ['data-sources'] });
       setSyncingId(null);
-      alert('Data Synchronization Completed Successfully!');
-    }, 1500);
+    }, 1200);
   };
 
   return (
@@ -25,7 +38,7 @@ export const DataSources: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Data Integrations</h1>
-          <p className="text-gray-400 text-sm mt-1">Connect database feeds, file repositories, and streaming pipelines to the core ontology.</p>
+          <p className="text-gray-400 text-sm mt-1">Connected datastores, sensor feeds and streaming pipelines wired into the core ontology.</p>
         </div>
         <button className="btn-primary px-4 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2">
           <Plus size={16} />
@@ -35,7 +48,7 @@ export const DataSources: React.FC = () => {
 
       {/* Grid List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {sources.map(source => (
+        {sources.map((source: DataSource) => (
           <div key={source.id} className="glass p-6 rounded-2xl border border-gray-800 space-y-4 relative overflow-hidden card-hover">
             {/* Header */}
             <div className="flex items-start justify-between">
@@ -53,11 +66,14 @@ export const DataSources: React.FC = () => {
               <span className={`px-2.5 py-0.5 rounded-full text-xxs font-bold flex items-center gap-1.5 ${
                 source.status === 'connected' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
                 source.status === 'syncing' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                source.status === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                source.status === 'disconnected' ? 'bg-gray-500/10 text-gray-400 border border-gray-500/20' :
                 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
               }`}>
                 {source.status === 'connected' && <CheckCircle size={10} />}
                 {source.status === 'syncing' && <RefreshCw size={10} className="animate-spin" />}
-                {source.status === 'warning' && <AlertCircle size={10} />}
+                {source.status === 'error' && <XCircle size={10} />}
+                {(source.status === 'warning' || source.status === 'disconnected') && <AlertCircle size={10} />}
                 {source.status}
               </span>
             </div>
@@ -70,21 +86,30 @@ export const DataSources: React.FC = () => {
               </div>
               <div>
                 <p className="text-gray-500 font-semibold uppercase tracking-wider text-xxs">Resource Target</p>
-                <p className="text-gray-300 font-medium truncate mt-0.5">{source.database}</p>
+                <p className="text-gray-300 font-medium truncate mt-0.5">{source.database || '—'}</p>
               </div>
               <div>
                 <p className="text-gray-500 font-semibold uppercase tracking-wider text-xxs">Total Records</p>
-                <p className="text-gray-300 font-medium mt-0.5">{source.records}</p>
+                <p className="text-gray-300 font-medium mt-0.5">{formatRecords(source.recordCount)}</p>
               </div>
               <div>
                 <p className="text-gray-500 font-semibold uppercase tracking-wider text-xxs">Last Synced</p>
-                <p className="text-gray-300 font-medium mt-0.5">{source.lastSync}</p>
+                <p className="text-gray-300 font-medium mt-0.5">{timeAgo(source.lastSync)}</p>
               </div>
             </div>
 
-            {source.error && (
+            {source.errorMessage && (
               <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-xl text-xxs text-red-400 font-medium">
-                Warning: {source.error}
+                Warning: {source.errorMessage}
+              </div>
+            )}
+
+            {/* Tags */}
+            {source.tags?.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {source.tags.map((t) => (
+                  <span key={t} className="px-2 py-0.5 rounded-md bg-gray-800/60 text-gray-400 text-xxs font-medium">{t}</span>
+                ))}
               </div>
             )}
 
