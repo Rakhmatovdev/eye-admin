@@ -12,6 +12,9 @@ import { Monitoring } from '../pages/Monitoring';
 import { AuditLogs } from '../pages/AuditLogs';
 import { RemoteAgents } from '../pages/RemoteAgents';
 import { Security } from '../pages/Security';
+import { Surveillance } from '../pages/Surveillance';
+import { Command } from '../pages/Command';
+import { ThreatIntel } from '../pages/ThreatIntel';
 
 export const router = createBrowserRouter([
   {
@@ -65,6 +68,18 @@ export const router = createBrowserRouter([
       {
         path: 'security',
         element: <Security />,
+      },
+      {
+        path: 'surveillance',
+        element: <Surveillance />,
+      },
+      {
+        path: 'command',
+        element: <Command />,
+      },
+      {
+        path: 'threat-intel',
+        element: <ThreatIntel />,
       },
     ],
   },

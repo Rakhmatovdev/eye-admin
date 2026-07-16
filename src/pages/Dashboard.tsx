@@ -20,14 +20,24 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import { useQuery } from '@tanstack/react-query';
+import { sensorsApi } from '../api/sensors';
+import { militaryApi } from '../api/military';
+import { usersApi } from '../api/users';
+import { entitiesApi } from '../api/entities';
 
 export const Dashboard: React.FC = () => {
-  // Mock Stats Data
+  // Live platform metrics (fall back gracefully inside each api on error).
+  const { data: sensorStats } = useQuery({ queryKey: ['dash-sensors'], queryFn: sensorsApi.stats });
+  const { data: milStats } = useQuery({ queryKey: ['dash-mil'], queryFn: militaryApi.stats });
+  const { data: users } = useQuery({ queryKey: ['dash-users'], queryFn: () => usersApi.getUsers() });
+  const { data: entityTypes } = useQuery({ queryKey: ['dash-types'], queryFn: entitiesApi.getEntityTypes });
+
   const stats = [
-    { name: 'Total Users', value: '1,248', icon: Users, trend: '+12%', up: true, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { name: 'Active Sessions', value: '84', icon: Activity, trend: '+4%', up: true, color: 'text-green-500', bg: 'bg-green-500/10' },
-    { name: 'Mapped Entities', value: '142.8K', icon: Layers, trend: '+28%', up: true, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-    { name: 'Threat Alerts', value: '3', icon: ShieldAlert, trend: '-18%', up: false, color: 'text-red-500', bg: 'bg-red-500/10' },
+    { name: 'Total Users', value: users ? String(users.length) : '—', icon: Users, trend: 'live', up: true, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { name: 'Sensors Online', value: sensorStats ? `${sensorStats.online}/${sensorStats.total}` : '—', icon: Activity, trend: `${sensorStats?.degraded ?? 0} deg`, up: true, color: 'text-green-500', bg: 'bg-green-500/10' },
+    { name: 'Threat Tracks', value: milStats ? String(milStats.threats) : '—', icon: ShieldAlert, trend: `${milStats?.critical_threats ?? 0} crit`, up: false, color: 'text-red-500', bg: 'bg-red-500/10' },
+    { name: 'Active Missions', value: milStats ? String(milStats.active_missions) : '—', icon: Layers, trend: 'ops', up: true, color: 'text-purple-500', bg: 'bg-purple-500/10' },
   ];
 
   // Mock Traffic Data
@@ -40,14 +50,10 @@ export const Dashboard: React.FC = () => {
     { time: '20:00', requests: 1900, errors: 22 },
   ];
 
-  // Mock Entity Distribution Data
-  const entityData = [
-    { name: 'Person', value: 4500, color: '#3B82F6' },
-    { name: 'Organization', value: 1200, color: '#10B981' },
-    { name: 'Location', value: 850, color: '#F59E0B' },
-    { name: 'Phone', value: 2400, color: '#06B6D4' },
-    { name: 'Vehicle', value: 650, color: '#EF4444' },
-  ];
+  // Entity distribution from the live ontology (grouped by type).
+  const entityData = (entityTypes ?? [])
+    .slice(0, 6)
+    .map((t) => ({ name: t.name, value: t.count, color: t.color }));
 
   const recentIncidents = [
     { id: '1', title: 'Brute Force Attempt', status: 'Blocked', severity: 'High', time: '12m ago', target: 'admin@platform.io' },

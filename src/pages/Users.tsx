@@ -1,58 +1,72 @@
 import React, { useState } from 'react';
-import { Plus, Search, Filter, Edit2, ShieldAlert, LogOut, Check, Trash } from 'lucide-react';
+import { Plus, Search, Filter, ShieldAlert, Check, Trash } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { usersApi } from '../api/users';
+import type { ClearanceLevel, User, UserRole } from '../types';
 
 export const Users: React.FC = () => {
-  // Mock User Data
-  const [users, setUsers] = useState([
-    { id: '1', name: 'Alisher Karimov', email: 'alisher@nexus.io', role: 'admin', clearance: 'TOP_SECRET', status: 'active', department: 'Executive', lastLogin: '10m ago' },
-    { id: '2', name: 'Elena Petrova', email: 'elena@nexus.io', role: 'analyst', clearance: 'SECRET', status: 'active', department: 'Threat Intel', lastLogin: '1h ago' },
-    { id: '3', name: 'Rustam Nazarov', email: 'rustam@nexus.io', role: 'analyst', clearance: 'CONFIDENTIAL', status: 'suspended', department: 'Field Ops', lastLogin: '3d ago' },
-    { id: '4', name: 'John Doe', email: 'john@nexus.io', role: 'viewer', clearance: 'UNCLASSIFIED', status: 'active', department: 'Audit', lastLogin: '1d ago' },
-    { id: '5', name: 'Sarah Connor', email: 'sarah@nexus.io', role: 'operator', clearance: 'SECRET', status: 'active', department: 'Defense', lastLogin: '45m ago' },
-  ]);
+  const queryClient = useQueryClient();
+
+  const { data: users = [], isLoading } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => usersApi.getUsers(),
+  });
 
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
-  const [newRole, setNewRole] = useState('analyst');
-  const [newClearance, setNewClearance] = useState('SECRET');
+  const [newRole, setNewRole] = useState<UserRole>('analyst');
+  const [newClearance, setNewClearance] = useState<ClearanceLevel>('SECRET');
   const [newDepartment, setNewDepartment] = useState('Threat Intel');
+
+  const createMutation = useMutation({
+    mutationFn: (data: Partial<User>) => usersApi.createUser(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: (user: User) =>
+      user.status === 'active' ? usersApi.suspendUser(user.id) : usersApi.activateUser(user.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => usersApi.deleteUser(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
 
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
-    const newUser = {
-      id: String(users.length + 1),
+    createMutation.mutate({
       name: newName,
       email: newEmail,
       role: newRole,
       clearance: newClearance,
-      status: 'active',
       department: newDepartment,
-      lastLogin: 'Never'
-    };
-    setUsers([newUser, ...users]);
+    });
     setShowCreateModal(false);
     setNewName('');
     setNewEmail('');
   };
 
-  const handleToggleStatus = (id: string) => {
-    setUsers(users.map(u => {
-      if (u.id === id) {
-        return { ...u, status: u.status === 'active' ? 'suspended' : 'active' };
-      }
-      return u;
-    }));
+  const handleToggleStatus = (user: User) => {
+    toggleStatusMutation.mutate(user);
   };
 
   const handleDeleteUser = (id: string) => {
     if (confirm('Are you sure you want to delete this identity?')) {
-      setUsers(users.filter(u => u.id !== id));
+      deleteMutation.mutate(id);
     }
   };
 
-  const filteredUsers = users.filter(u => 
+  const filteredUsers = users.filter(u =>
     u.name.toLowerCase().includes(search.toLowerCase()) ||
     u.email.toLowerCase().includes(search.toLowerCase()) ||
     u.department.toLowerCase().includes(search.toLowerCase())
@@ -111,6 +125,16 @@ export const Users: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800/60">
+              {isLoading && (
+                <tr>
+                  <td colSpan={7} className="p-6 text-center text-sm text-gray-500">Loading identities…</td>
+                </tr>
+              )}
+              {!isLoading && filteredUsers.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-6 text-center text-sm text-gray-500">No users found.</td>
+                </tr>
+              )}
               {filteredUsers.map(user => (
                 <tr key={user.id} className="table-row-hover text-sm">
                   <td className="p-4">
@@ -150,7 +174,7 @@ export const Users: React.FC = () => {
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button
-                        onClick={() => handleToggleStatus(user.id)}
+                        onClick={() => handleToggleStatus(user)}
                         title={user.status === 'active' ? 'Suspend Access' : 'Activate Access'}
                         className={`p-1.5 rounded-lg border transition-all ${
                           user.status === 'active'
@@ -212,7 +236,7 @@ export const Users: React.FC = () => {
                   <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">System Role</label>
                   <select
                     value={newRole}
-                    onChange={e => setNewRole(e.target.value)}
+                    onChange={e => setNewRole(e.target.value as UserRole)}
                     className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-blue-500"
                   >
                     <option value="admin">Administrator</option>
@@ -225,7 +249,7 @@ export const Users: React.FC = () => {
                   <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">Clearance Class</label>
                   <select
                     value={newClearance}
-                    onChange={e => setNewClearance(e.target.value)}
+                    onChange={e => setNewClearance(e.target.value as ClearanceLevel)}
                     className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-blue-500"
                   >
                     <option value="TOP_SECRET">Top Secret</option>
@@ -257,9 +281,10 @@ export const Users: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="btn-primary px-4 py-2 rounded-xl text-sm font-semibold text-white"
+                  disabled={createMutation.isPending}
+                  className="btn-primary px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
                 >
-                  Provision User
+                  {createMutation.isPending ? 'Provisioning…' : 'Provision User'}
                 </button>
               </div>
             </form>

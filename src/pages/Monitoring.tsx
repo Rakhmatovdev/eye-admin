@@ -1,75 +1,56 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  LineChart, 
-  Line, 
-  AreaChart, 
-  Area, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer 
+import React from 'react';
+import {
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
 } from 'recharts';
-import { Cpu, HardDrive, Network, Layers, RefreshCw } from 'lucide-react';
+import { Cpu, HardDrive, Network } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { monitoringApi } from '../api/monitoring';
+import type { ServiceStatus } from '../types';
 
 interface MetricNode {
   time: string;
   cpu: number;
   ram: number;
-  requests: number;
+}
+
+function statusDotClass(status: ServiceStatus['status']): string {
+  if (status === 'healthy') return 'bg-green-500';
+  if (status === 'degraded') return 'bg-amber-500';
+  if (status === 'down') return 'bg-red-500';
+  return 'bg-gray-500';
 }
 
 export const Monitoring: React.FC = () => {
-  const [metrics, setMetrics] = useState<MetricNode[]>([]);
-  const [cpuUsage, setCpuUsage] = useState(24.8);
-  const [ramUsage, setRamUsage] = useState(62.4);
-  const [requestsSec, setRequestsSec] = useState(42);
+  const { data: services = [] } = useQuery({
+    queryKey: ['monitoring', 'services'],
+    queryFn: () => monitoringApi.getServices(),
+    refetchInterval: 5000,
+  });
 
-  // Initialize and update metrics in real-time
-  useEffect(() => {
-    // Generate initial history points
-    const history: MetricNode[] = [];
-    const now = new Date();
-    for (let i = 15; i >= 0; i--) {
-      const timeStr = new Date(now.getTime() - i * 3000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      history.push({
-        time: timeStr,
-        cpu: Math.floor(Math.random() * 30 + 15),
-        ram: Math.floor(Math.random() * 10 + 55),
-        requests: Math.floor(Math.random() * 40 + 20),
-      });
-    }
-    setMetrics(history);
+  const { data: metricsData } = useQuery({
+    queryKey: ['monitoring', 'metrics'],
+    queryFn: () => monitoringApi.getMetrics(),
+    refetchInterval: 2000,
+  });
 
-    const interval = setInterval(() => {
-      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const newCpu = Math.floor(Math.random() * 40 + 10);
-      const newRam = Math.floor(Math.random() * 5 + 60);
-      const newRequests = Math.floor(Math.random() * 60 + 15);
+  const metrics: MetricNode[] = (metricsData?.cpu ?? []).map((point, i) => ({
+    time: new Date(point.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    cpu: Math.round(point.value),
+    ram: Math.round(metricsData?.ram[i]?.value ?? 0),
+  }));
 
-      setCpuUsage(newCpu);
-      setRamUsage(newRam);
-      setRequestsSec(newRequests);
-
-      setMetrics(prev => [
-        ...prev.slice(1),
-        { time: timeStr, cpu: newCpu, ram: newRam, requests: newRequests }
-      ]);
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const services = [
-    { name: 'PostgreSQL Relational DB', status: 'healthy', uptime: '99.98%', latency: '8ms' },
-    { name: 'Redis Cache Server', status: 'healthy', uptime: '99.99%', latency: '2ms' },
-    { name: 'WebSocket Broadcast Server', status: 'healthy', uptime: '100%', latency: '1ms' },
-    { name: 'SIEM Threat Intelligence', status: 'healthy', uptime: '99.95%', latency: '14ms' },
-    { name: 'ETL Ingestion Pipelines', status: 'healthy', uptime: '99.90%', latency: '40ms' },
-    { name: 'mTLS Agent Controller', status: 'healthy', uptime: '99.85%', latency: '120ms' },
-  ];
+  const cpuUsage = metrics.length ? metrics[metrics.length - 1].cpu : 0;
+  const ramUsage = metrics.length ? metrics[metrics.length - 1].ram : 0;
+  const apiRps = metricsData?.apiRps ?? [];
+  const requestsSec = apiRps.length ? Math.round(apiRps[apiRps.length - 1].value) : 0;
 
   return (
     <div className="space-y-6">
@@ -151,15 +132,15 @@ export const Monitoring: React.FC = () => {
       <div className="glass p-6 rounded-2xl border border-gray-800">
         <h4 className="text-base font-bold text-white mb-4">Node Operations & Service Status</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {services.map((srv, idx) => (
-            <div key={idx} className="bg-gray-950/40 p-4 border border-gray-800/40 rounded-xl space-y-2 flex flex-col justify-between">
+          {services.map((srv) => (
+            <div key={srv.id} className="bg-gray-950/40 p-4 border border-gray-800/40 rounded-xl space-y-2 flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-sm text-gray-200">{srv.name}</span>
-                <span className="w-2.5 h-2.5 rounded-full bg-green-500 live-dot inline-block" />
+                <span className={`w-2.5 h-2.5 rounded-full live-dot inline-block ${statusDotClass(srv.status)}`} />
               </div>
               <div className="flex justify-between text-xs text-gray-500 pt-2 border-t border-gray-800/30">
-                <span>Uptime: {srv.uptime}</span>
-                <span>Latency: {srv.latency}</span>
+                <span>Uptime: {srv.uptime}%</span>
+                <span>Latency: {srv.responseTime}ms</span>
               </div>
             </div>
           ))}

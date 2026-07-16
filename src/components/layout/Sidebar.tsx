@@ -8,9 +8,12 @@ import {
   Binary, 
   Activity, 
   FileSpreadsheet, 
-  Cpu, 
-  ShieldAlert, 
-  LogOut 
+  Cpu,
+  ShieldAlert,
+  LogOut,
+  Cctv,
+  Crosshair,
+  Brain
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
@@ -31,8 +34,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => 
     { name: 'Ontology', path: '/ontology', icon: Binary },
     { name: 'Monitoring', path: '/monitoring', icon: Activity },
     { name: 'Audit Logs', path: '/audit-logs', icon: FileSpreadsheet },
+    { name: 'Surveillance', path: '/surveillance', icon: Cctv },
+    { name: 'Command & Control', path: '/command', icon: Crosshair },
     { name: 'Remote Agents', path: '/remote-agents', icon: Cpu },
     { name: 'Security Center', path: '/security', icon: ShieldAlert },
+    { name: 'Threat Intel', path: '/threat-intel', icon: Brain },
   ];
 
   return (

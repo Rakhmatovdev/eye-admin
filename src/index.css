@@ -240,6 +240,21 @@ body {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
+/* Shared form input used by admin CRUD forms */
+.inp {
+  width: 100%;
+  background: #030712;
+  border: 1px solid #1f2937;
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #d1d5db;
+}
+.inp:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
 /* Button styles */
 .btn-primary {
   background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);

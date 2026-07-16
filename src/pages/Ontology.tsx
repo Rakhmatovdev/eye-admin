@@ -1,57 +1,50 @@
-import React, { useState } from 'react';
-import { Layers, Plus, Link, HelpCircle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Layers, Plus, Link } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { entitiesApi } from '../api/entities';
+import type { EntityType } from '../types';
 
 export const Ontology: React.FC = () => {
-  const [selectedEntity, setSelectedEntity] = useState('person');
+  const queryClient = useQueryClient();
 
-  const [entities] = useState([
-    {
-      id: 'person',
-      name: 'Person',
-      color: '#3B82F6',
-      description: 'Physical individual identity containing biometric registry, passport information, and contact logs.',
-      properties: [
-        { name: 'passport_id', type: 'string', required: true, desc: 'Biometric registry identifier' },
-        { name: 'full_name', type: 'string', required: true, desc: 'First and last name' },
-        { name: 'date_of_birth', type: 'date', required: true, desc: 'Date of birth' },
-        { name: 'nationality', type: 'string', required: false, desc: 'Country of citizenship' },
-      ],
-      relationships: [
-        { target: 'phone', name: 'owns_phone', type: 'one-to-many' },
-        { target: 'organization', name: 'employed_at', type: 'many-to-one' },
-        { target: 'vehicle', name: 'drives', type: 'many-to-many' },
-      ]
+  const { data: entities = [], isLoading } = useQuery({
+    queryKey: ['entity-types'],
+    queryFn: entitiesApi.getEntityTypes,
+  });
+
+  const [selectedEntity, setSelectedEntity] = useState('');
+
+  useEffect(() => {
+    if (!selectedEntity && entities.length) setSelectedEntity(entities[0].id);
+  }, [entities, selectedEntity]);
+
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newColor, setNewColor] = useState('#3B82F6');
+
+  const createMutation = useMutation({
+    mutationFn: (data: Partial<EntityType>) => entitiesApi.createEntityType(data),
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ['entity-types'] });
+      setSelectedEntity(created.id);
     },
-    {
-      id: 'organization',
-      name: 'Organization',
-      color: '#10B981',
-      description: 'Legal corporation entity, trading registries, government ministries, or commercial companies.',
-      properties: [
-        { name: 'tax_id', type: 'string', required: true, desc: 'State tax registration number' },
-        { name: 'legal_name', type: 'string', required: true, desc: 'Registered enterprise name' },
-        { name: 'incorporation_date', type: 'date', required: false, desc: 'Incorporation registry date' },
-      ],
-      relationships: [
-        { target: 'person', name: 'employs', type: 'one-to-many' },
-        { target: 'location', name: 'headquartered_in', type: 'many-to-one' },
-      ]
-    },
-    {
-      id: 'phone',
-      name: 'Phone Number',
-      color: '#06B6D4',
-      description: 'GSM / LTE Telecommunication endpoint, mobile SIM, or landline identifier.',
-      properties: [
-        { name: 'msisdn', type: 'string', required: true, desc: 'Standard international phone number format' },
-        { name: 'imsi', type: 'string', required: false, desc: 'SIM identity number' },
-        { name: 'carrier', type: 'string', required: false, desc: 'Telecom carrier' },
-      ],
-      relationships: [
-        { target: 'person', name: 'owned_by', type: 'many-to-one' },
-      ]
-    }
-  ]);
+  });
+
+  const handleCreateEntity = (e: React.FormEvent) => {
+    e.preventDefault();
+    createMutation.mutate({
+      name: newName,
+      description: newDescription,
+      color: newColor,
+      icon: '🔹',
+      properties: [],
+      relationships: [],
+    });
+    setShowCreateModal(false);
+    setNewName('');
+    setNewDescription('');
+  };
 
   const selectedNode = entities.find(e => e.id === selectedEntity) || entities[0];
 
@@ -63,7 +56,10 @@ export const Ontology: React.FC = () => {
           <h1 className="text-2xl font-bold tracking-tight text-white">Ontology & Schema Manager</h1>
           <p className="text-gray-400 text-sm mt-1">Define real-world entity models (nodes) and their semantic connections (edges).</p>
         </div>
-        <button className="btn-primary px-4 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2">
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="btn-primary px-4 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2"
+        >
           <Plus size={16} />
           <span>New Entity Class</span>
         </button>
@@ -73,6 +69,12 @@ export const Ontology: React.FC = () => {
         {/* Left Side: Classes */}
         <div className="space-y-3">
           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Entity Classes</h4>
+          {isLoading && (
+            <div className="text-sm text-gray-500 p-4">Loading ontology…</div>
+          )}
+          {!isLoading && entities.length === 0 && (
+            <div className="text-sm text-gray-500 p-4">No entity classes found.</div>
+          )}
           {entities.map(ent => (
             <button
               key={ent.id}
@@ -83,9 +85,9 @@ export const Ontology: React.FC = () => {
                   : 'bg-gray-900/50 border-gray-800 text-gray-300 hover:bg-gray-800/40'
               }`}
             >
-              <div 
+              <div
                 className="p-2 rounded-lg border flex items-center justify-center"
-                style={{ 
+                style={{
                   color: ent.color,
                   borderColor: selectedEntity === ent.id ? 'rgba(59, 130, 246, 0.2)' : 'rgba(30, 41, 59, 0.8)',
                   backgroundColor: selectedEntity === ent.id ? 'rgba(59, 130, 246, 0.05)' : 'rgba(17, 24, 39, 0.8)'
@@ -106,77 +108,146 @@ export const Ontology: React.FC = () => {
           {/* Interactive SVG Diagram preview */}
           <div className="glass p-5 rounded-2xl border border-gray-800 relative h-48 flex items-center justify-center overflow-hidden">
             <div className="absolute top-3 left-4 text-xxs font-bold text-gray-500 uppercase tracking-wider">Ontology Mapping View</div>
-            
-            {/* Simple SVGs showing nodes and relationships */}
+
+            {/* Simple SVGs showing nodes and relationships, driven by the live entity classes */}
             <svg className="w-full h-full max-w-sm" viewBox="0 0 300 100">
-              {/* Lines */}
-              <line x1="60" y1="50" x2="150" y2="50" stroke="#475569" strokeWidth="2" strokeDasharray="3" />
-              <line x1="150" y1="50" x2="240" y2="50" stroke="#475569" strokeWidth="2" strokeDasharray="3" />
-              
-              {/* Nodes */}
-              <circle cx="60" cy="50" r="16" fill="#3B82F6" className="cursor-pointer" onClick={() => setSelectedEntity('person')} />
-              <text x="60" y="85" textAnchor="middle" fill="#94A3B8" fontSize="10" fontWeight="bold">Person</text>
-
-              <circle cx="150" cy="50" r="16" fill="#10B981" className="cursor-pointer" onClick={() => setSelectedEntity('organization')} />
-              <text x="150" y="85" textAnchor="middle" fill="#94A3B8" fontSize="10" fontWeight="bold">Organization</text>
-
-              <circle cx="240" cy="50" r="16" fill="#06B6D4" className="cursor-pointer" onClick={() => setSelectedEntity('phone')} />
-              <text x="240" y="85" textAnchor="middle" fill="#94A3B8" fontSize="10" fontWeight="bold">Phone</text>
+              {entities.slice(0, 3).map((ent, idx) => {
+                const cx = 60 + idx * 90;
+                return (
+                  <React.Fragment key={ent.id}>
+                    {idx > 0 && (
+                      <line x1={cx - 90} y1="50" x2={cx} y2="50" stroke="#475569" strokeWidth="2" strokeDasharray="3" />
+                    )}
+                    <circle cx={cx} cy="50" r="16" fill={ent.color} className="cursor-pointer" onClick={() => setSelectedEntity(ent.id)} />
+                    <text x={cx} y="85" textAnchor="middle" fill="#94A3B8" fontSize="10" fontWeight="bold">{ent.name}</text>
+                  </React.Fragment>
+                );
+              })}
             </svg>
           </div>
 
           {/* Properties Details */}
-          <div className="glass p-6 rounded-2xl border border-gray-800 space-y-5">
-            <div>
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedNode.color }} />
-                {selectedNode.name} Schema Definition
-              </h3>
-              <p className="text-xs text-gray-500 mt-1">{selectedNode.description}</p>
-            </div>
+          {selectedNode && (
+            <div className="glass p-6 rounded-2xl border border-gray-800 space-y-5">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedNode.color }} />
+                  {selectedNode.name} Schema Definition
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">{selectedNode.description}</p>
+              </div>
 
-            {/* Properties Table */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Properties</h4>
-              <div className="bg-gray-950/40 border border-gray-800/60 rounded-xl overflow-hidden divide-y divide-gray-800/40">
-                {selectedNode.properties.map((prop, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3.5 text-xs">
-                    <div>
-                      <p className="font-semibold text-gray-200">{prop.name}</p>
-                      <p className="text-xxs text-gray-500 mt-0.5">{prop.desc}</p>
+              {/* Properties Table */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Properties</h4>
+                <div className="bg-gray-950/40 border border-gray-800/60 rounded-xl overflow-hidden divide-y divide-gray-800/40">
+                  {selectedNode.properties.length === 0 && (
+                    <div className="p-3.5 text-xs text-gray-500">No observed properties yet.</div>
+                  )}
+                  {selectedNode.properties.map((prop, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3.5 text-xs">
+                      <div>
+                        <p className="font-semibold text-gray-200">{prop.name}</p>
+                        <p className="text-xxs text-gray-500 mt-0.5">{prop.description}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-gray-800 text-gray-400 text-xxs uppercase">{prop.type}</span>
+                        {prop.required && (
+                          <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 text-xxs font-bold">Required</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-gray-800 text-gray-400 text-xxs uppercase">{prop.type}</span>
-                      {prop.required && (
-                        <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 text-xxs font-bold">Required</span>
-                      )}
+                  ))}
+                </div>
+              </div>
+
+              {/* Semantic Relationships */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Semantic Connections (Edges)</h4>
+                <div className="bg-gray-950/40 border border-gray-800/60 rounded-xl overflow-hidden divide-y divide-gray-800/40">
+                  {selectedNode.relationships.length === 0 && (
+                    <div className="p-3.5 text-xs text-gray-500">No relationships mapped yet.</div>
+                  )}
+                  {selectedNode.relationships.map((rel, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3.5 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Link size={12} className="text-gray-500" />
+                        <span className="font-bold text-gray-200">{rel.name}</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-gray-500 uppercase text-xxs">Target: {rel.targetType}</span>
+                        <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-xxs font-semibold">{rel.cardinality}</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
-
-            {/* Semantic Relationships */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Semantic Connections (Edges)</h4>
-              <div className="bg-gray-950/40 border border-gray-800/60 rounded-xl overflow-hidden divide-y divide-gray-800/40">
-                {selectedNode.relationships.map((rel, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3.5 text-xs">
-                    <div className="flex items-center gap-2">
-                      <Link size={12} className="text-gray-500" />
-                      <span className="font-bold text-gray-200">{rel.name}</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-gray-500 uppercase text-xxs">Target: {rel.target}</span>
-                      <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-xxs font-semibold">{rel.type}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* New Entity Class Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
+          <div className="glass w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-gray-800">
+            <div className="p-6 border-b border-gray-800 bg-gray-950/50">
+              <h3 className="text-lg font-bold text-white">Define New Entity Class</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Register a new ontology node type for the graph schema.</p>
+            </div>
+            <form onSubmit={handleCreateEntity} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">Class Name</label>
+                <input
+                  type="text"
+                  required
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-blue-500"
+                  placeholder="e.g. Vehicle"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">Description</label>
+                <input
+                  type="text"
+                  required
+                  value={newDescription}
+                  onChange={e => setNewDescription(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-blue-500"
+                  placeholder="Short description of this entity class..."
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">Accent Color</label>
+                <input
+                  type="color"
+                  value={newColor}
+                  onChange={e => setNewColor(e.target.value)}
+                  className="w-16 h-9 bg-gray-950 border border-gray-800 rounded-xl px-1 py-1"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 border border-gray-800 rounded-xl text-sm font-semibold text-gray-400 hover:bg-gray-800/30 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  className="btn-primary px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {createMutation.isPending ? 'Creating…' : 'Create Entity Class'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

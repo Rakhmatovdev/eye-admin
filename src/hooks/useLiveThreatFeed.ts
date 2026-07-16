@@ -2,9 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ThreatFeedItem } from '../types';
 import { THREAT_FEED_SEED, generateThreatFeedItem } from '../api/security';
 
+// Derive the WS URL from the current hostname (not a baked-in env value) so
+// this also works when the admin panel is opened over LAN from another
+// machine, e.g. http://192.168.1.42:3000 -> ws://192.168.1.42:8080/ws.
 const resolveWsUrl = () => {
-  const apiUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8080';
-  return apiUrl.replace(/^http/, 'ws') + '/ws';
+  const envUrl = (import.meta as any).env?.VITE_WS_URL as string | undefined;
+  if (envUrl) return envUrl;
+  const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+  return `ws://${host}:8080/ws`;
 };
 
 export type FeedLinkStatus = 'connecting' | 'live' | 'simulated';
@@ -15,7 +20,7 @@ export type FeedLinkStatus = 'connecting' | 'live' | 'simulated';
  * the Security Center is always demonstrable, but the connection badge always
  * reflects the true state.
  */
-export function useLiveThreatFeed(maxItems = 60) {
+export function useLiveThreatFeed(maxItems = 30) {
   const [feed, setFeed] = useState<ThreatFeedItem[]>(THREAT_FEED_SEED);
   const [status, setStatus] = useState<FeedLinkStatus>('connecting');
   const [paused, setPaused] = useState(false);

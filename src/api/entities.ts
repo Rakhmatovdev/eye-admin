@@ -1,6 +1,45 @@
 import type { EntityType } from '../types';
+import apiClient from './client';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Visual metadata per known backend entity type.
+const TYPE_META: Record<string, { icon: string; color: string }> = {
+  person: { icon: '👤', color: '#3B82F6' },
+  organization: { icon: '🏢', color: '#10B981' },
+  location: { icon: '📍', color: '#F59E0B' },
+  vehicle: { icon: '🚗', color: '#EF4444' },
+  phone: { icon: '📱', color: '#06B6D4' },
+  document: { icon: '📄', color: '#94A3B8' },
+  transaction: { icon: '💰', color: '#A78BFA' },
+};
+
+interface RawEntity { type: string; properties?: Record<string, unknown> | null }
+
+// Derive the ontology (entity types + counts + observed properties) from the
+// live entities collection, so the Ontology page reflects real data.
+function aggregateTypes(entities: RawEntity[]): EntityType[] {
+  const groups: Record<string, { count: number; props: Set<string> }> = {};
+  for (const e of entities) {
+    const t = e.type || 'unknown';
+    (groups[t] ??= { count: 0, props: new Set() }).count++;
+    for (const k of Object.keys(e.properties || {})) groups[t].props.add(k);
+  }
+  return Object.entries(groups)
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(([type, g]) => ({
+      id: 'et-' + type,
+      name: type.charAt(0).toUpperCase() + type.slice(1),
+      icon: TYPE_META[type]?.icon ?? '🔹',
+      color: TYPE_META[type]?.color ?? '#3B82F6',
+      description: `${g.count} live ${type} ${g.count === 1 ? 'entity' : 'entities'} in the ontology graph`,
+      count: g.count,
+      properties: Array.from(g.props).map((p) => ({
+        name: p, type: 'string' as const, required: false, description: p, indexed: false,
+      })),
+      relationships: [],
+    }));
+}
 
 export const MOCK_ENTITY_TYPES: EntityType[] = [
   {
@@ -155,8 +194,14 @@ export const MOCK_ENTITY_TYPES: EntityType[] = [
 
 export const entitiesApi = {
   getEntityTypes: async (): Promise<EntityType[]> => {
-    await delay(400);
-    return MOCK_ENTITY_TYPES;
+    try {
+      const res = await apiClient.get('/v1/entities');
+      const entities: RawEntity[] = res.data?.data ?? [];
+      if (entities.length) return aggregateTypes(entities);
+      return MOCK_ENTITY_TYPES;
+    } catch {
+      return MOCK_ENTITY_TYPES;
+    }
   },
 
   getEntityType: async (id: string): Promise<EntityType> => {

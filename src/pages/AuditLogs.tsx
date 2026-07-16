@@ -1,36 +1,30 @@
 import React, { useState } from 'react';
-import { Search, Download, HelpCircle, AlertCircle, CheckCircle } from 'lucide-react';
+import { Search, Download, AlertCircle, CheckCircle } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { auditApi } from '../api/audit';
 
 export const AuditLogs: React.FC = () => {
-  const [logs] = useState([
-    { id: '1', timestamp: '2026-07-14T10:42:01Z', user: 'admin@platform.io', action: 'users:write', resource: 'user:provision', ip: '192.168.1.100', result: 'success', hash: '5b98a1c90...' },
-    { id: '2', timestamp: '2026-07-14T10:41:44Z', user: 'analyst@platform.io', action: 'entities:read', resource: 'entity:detail_360', ip: '10.0.12.44', result: 'success', hash: 'a129d892e...' },
-    { id: '3', timestamp: '2026-07-14T10:40:12Z', user: 'viewer@platform.io', action: 'graph:expand', resource: 'graph:case_102', ip: '192.168.10.15', result: 'success', hash: 'f928e83b8...' },
-    { id: '4', timestamp: '2026-07-14T10:38:22Z', user: 'unknown@platform.io', action: 'users:read', resource: 'users:list', ip: '185.220.101.4', result: 'failure', hash: '8b9812e3e...', error: 'Unprivileged session validation failure' },
-    { id: '5', timestamp: '2026-07-14T10:35:10Z', user: 'admin@platform.io', action: 'agents:command', resource: 'agent:restart', ip: '192.168.1.100', result: 'success', hash: 'c9081e82b...' },
-  ]);
+  const { data: logs = [], isLoading } = useQuery({
+    queryKey: ['audit', 'logs'],
+    queryFn: () => auditApi.getLogs(),
+  });
 
   const [search, setSearch] = useState('');
 
-  const filteredLogs = logs.filter(l => 
-    l.user.toLowerCase().includes(search.toLowerCase()) ||
+  const filteredLogs = logs.filter(l =>
+    l.userEmail.toLowerCase().includes(search.toLowerCase()) ||
     l.action.toLowerCase().includes(search.toLowerCase()) ||
     l.resource.toLowerCase().includes(search.toLowerCase()) ||
     l.ip.includes(search)
   );
 
-  const handleExportCSV = () => {
-    // Generate CSV content
-    const headers = 'ID,Timestamp,User,Action,Resource,IP,Result,Hash\n';
-    const rows = filteredLogs.map(l => 
-      `"${l.id}","${l.timestamp}","${l.user}","${l.action}","${l.resource}","${l.ip}","${l.result}","${l.hash}"`
-    ).join('\n');
-    
-    const blob = new Blob([headers + rows], { type: 'text/csv' });
+  const handleExportCSV = async () => {
+    const csv = await auditApi.exportLogs();
+    const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `brave_audit_logs_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `koz_audit_logs_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -84,10 +78,20 @@ export const AuditLogs: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800/60 font-mono text-xs">
+              {isLoading && (
+                <tr>
+                  <td colSpan={7} className="p-6 text-center text-gray-500">Loading audit trail...</td>
+                </tr>
+              )}
+              {!isLoading && filteredLogs.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-6 text-center text-gray-500">No audit log entries match this filter.</td>
+                </tr>
+              )}
               {filteredLogs.map(log => (
                 <tr key={log.id} className="table-row-hover">
                   <td className="p-4 text-gray-500">{new Date(log.timestamp).toLocaleString()}</td>
-                  <td className="p-4 font-semibold text-gray-300">{log.user}</td>
+                  <td className="p-4 font-semibold text-gray-300">{log.userEmail}</td>
                   <td className="p-4 text-blue-400 font-semibold">{log.action}</td>
                   <td className="p-4 text-gray-400">{log.resource}</td>
                   <td className="p-4 text-gray-500">{log.ip}</td>

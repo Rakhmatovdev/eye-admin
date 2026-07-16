@@ -1,62 +1,75 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Shield, Check, Save } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { rolesApi } from '../api/roles';
+import type { Role } from '../types';
 
 export const Roles: React.FC = () => {
-  const [selectedRole, setSelectedRole] = useState('analyst');
+  const queryClient = useQueryClient();
 
-  const [roles, setRoles] = useState([
-    { id: 'admin', name: 'Administrator', description: 'Complete administrative controls, full read/write, user provisioning and remote agent actions.' },
-    { id: 'analyst', name: 'Analyst', description: 'Standard intelligence analyst permissions. Access to graph investigation, timelines, and geospatial maps.' },
-    { id: 'viewer', name: 'Viewer', description: 'Read-only access to entity databases and saved cases. No write, export, or audit modifications.' },
-    { id: 'operator', name: 'Operator', description: 'Handles data ingest, scheduler parameters, and source configuration.' },
-  ]);
+  const { data: roles = [], isLoading: rolesLoading } = useQuery({
+    queryKey: ['roles'],
+    queryFn: rolesApi.getRoles,
+  });
 
-  const [permissions, setPermissions] = useState([
-    { key: 'users:write', name: 'Create/Provision Users', category: 'Identity' },
-    { key: 'users:read', name: 'Read Users Registry', category: 'Identity' },
-    { key: 'entities:write', name: 'Modify Ontology Nodes', category: 'Data Analysis' },
-    { key: 'entities:read', name: 'Read Entities', category: 'Data Analysis' },
-    { key: 'graph:expand', name: 'Perform Link Analysis', category: 'Data Analysis' },
-    { key: 'agents:command', name: 'Issue Remote Agent Commands', category: 'System Operations' },
-    { key: 'audit:read', name: 'View System Audit Logs', category: 'System Operations' },
-    { key: 'security:write', name: 'Resolve Incidents & Blocklist', category: 'Security' },
-  ]);
+  const { data: permissions = [] } = useQuery({
+    queryKey: ['permissions'],
+    queryFn: rolesApi.getPermissions,
+  });
 
-  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({
-    admin: [
-      'users:write', 'users:read', 'entities:write', 'entities:read',
-      'graph:expand', 'agents:command', 'audit:read', 'security:write'
-    ],
-    analyst: [
-      'users:read', 'entities:read', 'graph:expand'
-    ],
-    viewer: [
-      'entities:read'
-    ],
-    operator: [
-      'entities:write', 'entities:read', 'agents:command'
-    ],
+  const [selectedRole, setSelectedRole] = useState('');
+
+  useEffect(() => {
+    if (!selectedRole && roles.length) setSelectedRole(roles[0].id);
+  }, [roles, selectedRole]);
+
+  const toggleMutation = useMutation({
+    mutationFn: async ({ roleId, key }: { roleId: string; key: string }) => {
+      try {
+        return await rolesApi.togglePermission(roleId, key);
+      } catch {
+        return null;
+      }
+    },
+    onMutate: async ({ roleId, key }) => {
+      await queryClient.cancelQueries({ queryKey: ['roles'] });
+      const previous = queryClient.getQueryData<Role[]>(['roles']);
+      queryClient.setQueryData<Role[]>(['roles'], (old) =>
+        (old ?? []).map(r =>
+          r.id === roleId
+            ? {
+                ...r,
+                permissions: r.permissions.includes(key)
+                  ? r.permissions.filter(p => p !== key)
+                  : [...r.permissions, key],
+              }
+            : r
+        )
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(['roles'], context.previous);
+    },
   });
 
   const handleTogglePermission = (roleId: string, permKey: string) => {
-    const activePerms = rolePermissions[roleId] || [];
-    let updated: string[];
-
-    if (activePerms.includes(permKey)) {
-      updated = activePerms.filter(k => k !== permKey);
-    } else {
-      updated = [...activePerms, permKey];
-    }
-
-    setRolePermissions({
-      ...rolePermissions,
-      [roleId]: updated
-    });
+    toggleMutation.mutate({ roleId, key: permKey });
   };
 
   const handleSaveMatrix = () => {
     alert('RBAC Access Policies Updated Successfully!');
   };
+
+  const categories = useMemo(() => {
+    const seen: string[] = [];
+    for (const p of permissions) {
+      if (!seen.includes(p.category)) seen.push(p.category);
+    }
+    return seen;
+  }, [permissions]);
+
+  const currentRole = roles.find(r => r.id === selectedRole);
 
   return (
     <div className="space-y-6">
@@ -79,6 +92,9 @@ export const Roles: React.FC = () => {
         {/* Roles List */}
         <div className="space-y-3">
           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Access Roles</h4>
+          {rolesLoading && (
+            <div className="text-sm text-gray-500 p-4">Loading roles…</div>
+          )}
           {roles.map(role => (
             <button
               key={role.id}
@@ -95,7 +111,7 @@ export const Roles: React.FC = () => {
                 <Shield size={18} />
               </div>
               <div className="space-y-1">
-                <h5 className="font-bold text-sm text-white">{role.name}</h5>
+                <h5 className="font-bold text-sm text-white">{role.displayName}</h5>
                 <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{role.description}</p>
               </div>
             </button>
@@ -106,13 +122,13 @@ export const Roles: React.FC = () => {
         <div className="lg:col-span-2 glass p-6 rounded-2xl border border-gray-800 space-y-6">
           <div>
             <h4 className="text-base font-bold text-white">
-              Privileges for: {roles.find(r => r.id === selectedRole)?.name}
+              Privileges for: {currentRole?.displayName ?? '—'}
             </h4>
             <p className="text-xs text-gray-500 mt-0.5">Toggle check boxes to instantly provision/revoke role capability.</p>
           </div>
 
           <div className="space-y-6 overflow-y-auto max-h-[500px] pr-2">
-            {['Identity', 'Data Analysis', 'System Operations', 'Security'].map(cat => {
+            {categories.map(cat => {
               const catPerms = permissions.filter(p => p.category === cat);
               return (
                 <div key={cat} className="space-y-2">
@@ -121,11 +137,11 @@ export const Roles: React.FC = () => {
                   </h5>
                   <div className="space-y-2">
                     {catPerms.map(perm => {
-                      const hasPerm = (rolePermissions[selectedRole] || []).includes(perm.key);
+                      const hasPerm = (currentRole?.permissions || []).includes(perm.key);
                       return (
                         <div
                           key={perm.key}
-                          onClick={() => handleTogglePermission(selectedRole, perm.key)}
+                          onClick={() => currentRole && handleTogglePermission(currentRole.id, perm.key)}
                           className="flex items-center justify-between p-3.5 bg-gray-950/40 border border-gray-800/50 rounded-xl cursor-pointer hover:border-gray-700/50 transition-all"
                         >
                           <div className="space-y-0.5">

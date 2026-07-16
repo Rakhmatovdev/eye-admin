@@ -1,30 +1,72 @@
 import React, { useState } from 'react';
-import { Cpu, Terminal, Play, Circle, ShieldAlert } from 'lucide-react';
+import { Cpu, Terminal, Play, Circle } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { agentsApi } from '../api/agents';
+import type { Agent } from '../types';
+
+function statusTextClass(status: Agent['status']): string {
+  if (status === 'online') return 'text-green-400';
+  if (status === 'degraded' || status === 'updating') return 'text-amber-400';
+  return 'text-red-400';
+}
+
+function statusFillColor(status: Agent['status']): string {
+  if (status === 'online') return '#10B981';
+  if (status === 'degraded' || status === 'updating') return '#F59E0B';
+  return '#EF4444';
+}
+
+function heartbeatAgo(iso: string): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+}
 
 export const RemoteAgents: React.FC = () => {
-  const [agents, setAgents] = useState([
-    { id: '1', name: 'Tashkent Border Collector 01', type: 'collector', status: 'online', version: 'v1.4.2', heartbeat: '5s ago', location: 'Tashkent, UZ', platform: 'Linux x86_64', activeTask: 'Listening on Customs API' },
-    { id: '2', name: 'Samarkand Sensor Node', type: 'sensor', status: 'online', version: 'v1.4.1', heartbeat: '12s ago', location: 'Samarkand, UZ', platform: 'Raspberry Pi 4', activeTask: 'Syncing telemetry packet' },
-    { id: '3', name: 'Almaty Proxy Relay', type: 'relay', status: 'degraded', version: 'v1.4.0', heartbeat: '1m ago', location: 'Almaty, KZ', platform: 'Windows Server 2022', activeTask: 'Buffer queue threshold warning' },
-    { id: '4', name: 'Bishkek Collector 02', type: 'collector', status: 'offline', version: 'v1.4.2', heartbeat: '2h ago', location: 'Bishkek, KG', platform: 'Linux x86_64', activeTask: 'Idle / Network route timeout' },
-  ]);
+  const queryClient = useQueryClient();
+
+  const { data: agents = [] } = useQuery({
+    queryKey: ['agents'],
+    queryFn: () => agentsApi.getAgents(),
+    refetchInterval: 15000,
+  });
 
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [cmd, setCmd] = useState('restart');
-  const [logs, setLogs] = useState<string[]>([
-    '[2026-07-14 10:40:01] Initializing remote handshake...',
-    '[2026-07-14 10:40:02] mTLS verification completed (ClientCert verified)',
-    '[2026-07-14 10:40:02] Connected to core telemetry stream',
-  ]);
+  const [logs, setLogs] = useState<string[]>([]);
+
+  const sendCommandMutation = useMutation({
+    mutationFn: ({ agentId, command }: { agentId: string; command: string }) => agentsApi.sendCommand(agentId, command),
+    onSuccess: (result, variables) => {
+      const now = new Date().toLocaleString();
+      setLogs(prev => [
+        ...prev,
+        `[${now}] Command [${variables.command.toUpperCase()}] dispatched by System Administrator.`,
+        `[${now}] HANDSHAKE: Agent acknowledged command code.`,
+        `[${now}] EXECUTION: Command status = ${result.status}.`,
+      ]);
+      queryClient.invalidateQueries({ queryKey: ['agents', variables.agentId, 'commands'] });
+      alert(`Command [${variables.command.toUpperCase()}] successfully issued to Agent.`);
+    },
+    onError: () => {
+      alert('Failed to dispatch command to agent.');
+    },
+  });
+
+  const handleSelectAgent = (agent: Agent) => {
+    setSelectedAgentId(agent.id);
+    setLogs([
+      `[${new Date().toLocaleString()}] HANDSHAKE: Handled by edge endpoint ${agent.location}`,
+      `[${new Date().toLocaleString()}] MTLS: TLS_AES_256_GCM_SHA384 handshake completed`,
+      `[${new Date().toLocaleString()}] TELEMETRY: Streaming packet payload size 24.2KB`,
+    ]);
+  };
 
   const handleSendCommand = (agentId: string) => {
-    setLogs(prev => [
-      ...prev,
-      `[2026-07-14 10:44:12] Command [${cmd.toUpperCase()}] dispatched by System Administrator.`,
-      `[2026-07-14 10:44:13] HANDSHAKE: Agent acknowledged command code.`,
-      `[2026-07-14 10:44:15] EXECUTION: Command finished with exit code 0.`
-    ]);
-    alert(`Command [${cmd.toUpperCase()}] successfully issued to Agent.`);
+    sendCommandMutation.mutate({ agentId, command: cmd });
   };
 
   const activeAgent = agents.find(a => a.id === selectedAgentId);
@@ -47,14 +89,7 @@ export const RemoteAgents: React.FC = () => {
           {agents.map(agent => (
             <div
               key={agent.id}
-              onClick={() => {
-                setSelectedAgentId(agent.id);
-                setLogs([
-                  `[2026-07-14 10:40:01] HANDSHAKE: Handled by edge endpoint ${agent.location}`,
-                  `[2026-07-14 10:40:02] MTLS: TLS_AES_256_GCM_SHA384 handshake completed`,
-                  `[2026-07-14 10:40:03] TELEMETRY: Streaming packet payload size 24.2KB`,
-                ]);
-              }}
+              onClick={() => handleSelectAgent(agent)}
               className={`glass p-5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between h-44 card-hover ${
                 selectedAgentId === agent.id ? 'border-blue-500/50 bg-blue-600/5' : 'border-gray-800'
               }`}
@@ -68,14 +103,8 @@ export const RemoteAgents: React.FC = () => {
                     <span className="text-xxs text-gray-500 uppercase font-bold">{agent.type}</span>
                   </div>
                   {/* Status dot */}
-                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                    agent.status === 'online' ? 'text-green-400' :
-                    agent.status === 'degraded' ? 'text-amber-400' : 'text-red-400'
-                  }`}>
-                    <Circle size={8} fill={
-                      agent.status === 'online' ? '#10B981' :
-                      agent.status === 'degraded' ? '#F59E0B' : '#EF4444'
-                    } />
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${statusTextClass(agent.status)}`}>
+                    <Circle size={8} fill={statusFillColor(agent.status)} />
                     {agent.status}
                   </span>
                 </div>
@@ -85,8 +114,8 @@ export const RemoteAgents: React.FC = () => {
               </div>
 
               <div className="pt-2 border-t border-gray-800/40 flex justify-between items-center text-xxs text-gray-500">
-                <span className="truncate max-w-[150px]">{agent.activeTask}</span>
-                <span>{agent.heartbeat}</span>
+                <span className="truncate max-w-[150px]">CPU {agent.cpuUsage}% • MEM {agent.memUsage}%</span>
+                <span>{heartbeatAgo(agent.lastHeartbeat)}</span>
               </div>
             </div>
           ))}
@@ -117,7 +146,8 @@ export const RemoteAgents: React.FC = () => {
                   </select>
                   <button
                     onClick={() => handleSendCommand(activeAgent.id)}
-                    className="btn-primary p-2 rounded-lg text-white"
+                    disabled={sendCommandMutation.isPending}
+                    className="btn-primary p-2 rounded-lg text-white disabled:opacity-50"
                   >
                     <Play size={14} />
                   </button>
