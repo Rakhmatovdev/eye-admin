@@ -4,11 +4,7 @@ import type { AuthUser, UserRole, ClearanceLevel } from '../types';
 interface LoginCredentials {
   email: string;
   password: string;
-}
-
-interface AuthResponse {
-  user: AuthUser;
-  token: string;
+  otp?: string;
 }
 
 interface BackendUser {
@@ -21,11 +17,16 @@ interface BackendUser {
   status: string;
 }
 
+// Mirrors backend internal/auth.LoginResponse. When `mfa_required` is true the
+// account has MFA enabled and no (or an unverified) `otp` was supplied — the
+// token fields and `user` are then omitted and the caller must resubmit the
+// login request with `otp` set.
 interface LoginData {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-  user: BackendUser;
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  mfa_required?: boolean;
+  user?: BackendUser;
 }
 
 const VALID_ROLES: UserRole[] = ['admin', 'analyst', 'viewer', 'operator', 'auditor'];
@@ -52,19 +53,21 @@ function mapUser(u: BackendUser): AuthUser {
 }
 
 export const authApi = {
-  // The MVP backend authenticates in a single step (no MFA). We keep the
-  // `requiresMfa` shape for compatibility but always resolve it to false.
+  // POST /auth/login {email, password, otp?}. When the account has MFA
+  // enabled and no `otp` was supplied, the backend returns 200 with only
+  // `mfa_required: true` (no tokens) — the caller resubmits with `otp`.
   login: async (
     credentials: LoginCredentials
-  ): Promise<{ requiresMfa: boolean; mfaToken?: string; user?: AuthUser; token?: string }> => {
+  ): Promise<{ mfaRequired: boolean; user?: AuthUser; token?: string }> => {
     const res = await apiClient.post<{ data: LoginData }>('/v1/auth/login', credentials);
     const data = res.data.data;
-    return { requiresMfa: false, user: mapUser(data.user), token: data.access_token };
-  },
-
-  // Retained for interface compatibility; not used now that MFA is disabled.
-  verifyMfa: async (): Promise<AuthResponse> => {
-    throw new Error('MFA is not enabled on this deployment');
+    if (data.mfa_required) {
+      return { mfaRequired: true };
+    }
+    if (!data.user || !data.access_token) {
+      throw new Error('Malformed login response from server');
+    }
+    return { mfaRequired: false, user: mapUser(data.user), token: data.access_token };
   },
 
   logout: async (): Promise<void> => {

@@ -1,4 +1,4 @@
-import type { ServiceStatus, MetricPoint, AlertRule, DataSource } from '../types';
+import type { ServiceStatus, AlertRule, DataSource } from '../types';
 import apiClient from './client';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -46,12 +46,51 @@ export const MOCK_DATA_SOURCES: DataSource[] = [
   { id: 'ds-008', name: 'MySQL Auxiliary', type: 'mysql', status: 'error', host: 'mysql-aux.internal', database: 'auxiliary', lastSync: new Date(Date.now() - 86400000).toISOString(), recordCount: 23841, syncInterval: 1800, description: 'Auxiliary data store', tags: ['auxiliary'], errorMessage: 'Connection refused — service unreachable', },
 ];
 
-const generateMetricPoints = (baseValue: number, variance: number, count: number = 30): MetricPoint[] => {
-  return Array.from({ length: count }, (_, i) => ({
-    timestamp: new Date(Date.now() - (count - i) * 2000).toISOString(),
-    value: Math.max(0, Math.min(100, baseValue + (Math.random() - 0.5) * variance)),
-  }));
-};
+// Mirrors backend internal/monitoring.MetricResponse — real Go runtime
+// metrics (no synthetic cpu/disk/network numbers exist on the backend).
+export interface MetricsSample {
+  timestamp: string;
+  heap_alloc_mb: number;
+  sys_mem_mb: number;
+  memory_usage: number; // heap as % of reserved sys memory
+  goroutines: number;
+  num_gc: number;
+  uptime_seconds: number;
+  num_cpu: number;
+}
+
+const HISTORY_POINTS = 240;
+const SAMPLE_INTERVAL_MS = 15_000;
+
+// Synthesizes a plausible history series client-side, used when
+// GET /monitoring/metrics/history is unreachable (404/network error) so the
+// Monitoring page keeps working before/without that endpoint deployed.
+function generateMetricsHistory(count: number = HISTORY_POINTS): MetricsSample[] {
+  const now = Date.now();
+  const numCpu = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 8;
+  let heap = 40 + Math.random() * 20;
+  let goroutines = 60 + Math.random() * 20;
+  let numGc = 80;
+
+  return Array.from({ length: count }, (_, i) => {
+    heap = Math.max(10, Math.min(400, heap + (Math.random() - 0.5) * 6));
+    goroutines = Math.max(10, Math.min(300, goroutines + (Math.random() - 0.5) * 8));
+    if (Math.random() > 0.85) numGc += 1;
+    const sysMem = heap * (1.6 + Math.random() * 0.4);
+    const memoryUsage = +((heap / sysMem) * 100).toFixed(2);
+
+    return {
+      timestamp: new Date(now - (count - 1 - i) * SAMPLE_INTERVAL_MS).toISOString(),
+      heap_alloc_mb: +heap.toFixed(2),
+      sys_mem_mb: +sysMem.toFixed(2),
+      memory_usage: memoryUsage,
+      goroutines: Math.round(goroutines),
+      num_gc: numGc,
+      uptime_seconds: (count - (count - 1 - i)) * 15,
+      num_cpu: numCpu,
+    };
+  });
+}
 
 export const monitoringApi = {
   getServices: async (): Promise<ServiceStatus[]> => {
@@ -73,15 +112,17 @@ export const monitoringApi = {
     }
   },
 
-  getMetrics: async () => {
-    await delay(200);
-    return {
-      cpu: generateMetricPoints(65, 30),
-      ram: generateMetricPoints(72, 15),
-      disk: generateMetricPoints(58, 5),
-      network: generateMetricPoints(40, 40),
-      apiRps: generateMetricPoints(250, 100),
-    };
+  // GET /monitoring/metrics/history — buffered time series (oldest-first,
+  // ~15s samples, up to ~240 points), same shape as GET /monitoring/metrics.
+  // Falls back to a synthesized series if the endpoint isn't deployed yet.
+  getMetricsHistory: async (): Promise<MetricsSample[]> => {
+    try {
+      const data = await unwrap<MetricsSample[]>(apiClient.get('/v1/monitoring/metrics/history'));
+      if (!data?.length) return generateMetricsHistory();
+      return data;
+    } catch {
+      return generateMetricsHistory();
+    }
   },
 
   getDataSources: async (): Promise<DataSource[]> => {

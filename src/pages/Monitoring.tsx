@@ -17,8 +17,9 @@ import type { ServiceStatus } from '../types';
 
 interface MetricNode {
   time: string;
-  cpu: number;
-  ram: number;
+  memoryUsage: number;
+  goroutines: number;
+  heapMb: number;
 }
 
 function statusDotClass(status: ServiceStatus['status']): string {
@@ -35,22 +36,23 @@ export const Monitoring: React.FC = () => {
     refetchInterval: 5000,
   });
 
-  const { data: metricsData } = useQuery({
-    queryKey: ['monitoring', 'metrics'],
-    queryFn: () => monitoringApi.getMetrics(),
-    refetchInterval: 2000,
+  const { data: history = [] } = useQuery({
+    queryKey: ['monitoring', 'metrics-history'],
+    queryFn: () => monitoringApi.getMetricsHistory(),
+    refetchInterval: 20000,
   });
 
-  const metrics: MetricNode[] = (metricsData?.cpu ?? []).map((point, i) => ({
-    time: new Date(point.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-    cpu: Math.round(point.value),
-    ram: Math.round(metricsData?.ram[i]?.value ?? 0),
+  const metrics: MetricNode[] = history.map((sample) => ({
+    time: new Date(sample.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    memoryUsage: Math.round(sample.memory_usage),
+    goroutines: sample.goroutines,
+    heapMb: Math.round(sample.heap_alloc_mb),
   }));
 
-  const cpuUsage = metrics.length ? metrics[metrics.length - 1].cpu : 0;
-  const ramUsage = metrics.length ? metrics[metrics.length - 1].ram : 0;
-  const apiRps = metricsData?.apiRps ?? [];
-  const requestsSec = apiRps.length ? Math.round(apiRps[apiRps.length - 1].value) : 0;
+  const latest = history.length ? history[history.length - 1] : undefined;
+  const memoryUsage = latest ? Math.round(latest.memory_usage) : 0;
+  const heapMb = latest ? Math.round(latest.heap_alloc_mb) : 0;
+  const goroutines = latest ? latest.goroutines : 0;
 
   return (
     <div className="space-y-6">
@@ -67,21 +69,21 @@ export const Monitoring: React.FC = () => {
       {/* Numerical Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="glass p-5 rounded-2xl border border-gray-800 flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-500/10 text-blue-500 rounded-xl flex items-center justify-center border border-blue-500/20">
-            <Cpu size={22} />
-          </div>
-          <div>
-            <p className="text-xxs text-gray-500 uppercase font-semibold">CPU operational load</p>
-            <h3 className="text-2xl font-extrabold text-white">{cpuUsage}%</h3>
-          </div>
-        </div>
-        <div className="glass p-5 rounded-2xl border border-gray-800 flex items-center gap-4">
           <div className="w-12 h-12 bg-green-500/10 text-green-500 rounded-xl flex items-center justify-center border border-green-500/20">
             <HardDrive size={22} />
           </div>
           <div>
             <p className="text-xxs text-gray-500 uppercase font-semibold">Memory usage</p>
-            <h3 className="text-2xl font-extrabold text-white">{ramUsage}%</h3>
+            <h3 className="text-2xl font-extrabold text-white">{memoryUsage}%</h3>
+          </div>
+        </div>
+        <div className="glass p-5 rounded-2xl border border-gray-800 flex items-center gap-4">
+          <div className="w-12 h-12 bg-blue-500/10 text-blue-500 rounded-xl flex items-center justify-center border border-blue-500/20">
+            <Cpu size={22} />
+          </div>
+          <div>
+            <p className="text-xxs text-gray-500 uppercase font-semibold">Heap allocated</p>
+            <h3 className="text-2xl font-extrabold text-white">{heapMb} MB</h3>
           </div>
         </div>
         <div className="glass p-5 rounded-2xl border border-gray-800 flex items-center gap-4">
@@ -89,8 +91,8 @@ export const Monitoring: React.FC = () => {
             <Network size={22} />
           </div>
           <div>
-            <p className="text-xxs text-gray-500 uppercase font-semibold">Active load</p>
-            <h3 className="text-2xl font-extrabold text-white">{requestsSec} req/sec</h3>
+            <p className="text-xxs text-gray-500 uppercase font-semibold">Active goroutines</p>
+            <h3 className="text-2xl font-extrabold text-white">{goroutines}</h3>
           </div>
         </div>
       </div>
@@ -98,7 +100,7 @@ export const Monitoring: React.FC = () => {
       {/* Charts section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="glass p-5 rounded-2xl border border-gray-800">
-          <h4 className="text-base font-bold text-white mb-4">CPU Utilization (Real-time)</h4>
+          <h4 className="text-base font-bold text-white mb-4">Memory Usage % (Real-time)</h4>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={metrics}>
@@ -106,22 +108,22 @@ export const Monitoring: React.FC = () => {
                 <XAxis dataKey="time" hide />
                 <YAxis domain={[0, 100]} />
                 <Tooltip />
-                <Line type="monotone" dataKey="cpu" stroke="#3B82F6" strokeWidth={2} dot={false} isAnimationActive={false} />
+                <Line type="monotone" dataKey="memoryUsage" stroke="#3B82F6" strokeWidth={2} dot={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         <div className="glass p-5 rounded-2xl border border-gray-800">
-          <h4 className="text-base font-bold text-white mb-4">Memory Buffer Map</h4>
+          <h4 className="text-base font-bold text-white mb-4">Goroutine Count (Real-time)</h4>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={metrics}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="time" hide />
-                <YAxis domain={[0, 100]} />
+                <YAxis domain={[0, 'auto']} />
                 <Tooltip />
-                <Area type="monotone" dataKey="ram" stroke="#10B981" fill="#10B981" fillOpacity={0.1} strokeWidth={2} dot={false} isAnimationActive={false} />
+                <Area type="monotone" dataKey="goroutines" stroke="#10B981" fill="#10B981" fillOpacity={0.1} strokeWidth={2} dot={false} isAnimationActive={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

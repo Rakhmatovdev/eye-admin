@@ -22,10 +22,16 @@ export const Login: React.FC = () => {
     setError('');
 
     try {
-      // MVP backend authenticates in one step (no MFA).
-      const { user, token } = await authApi.login({ email, password });
-      if (user && token) {
-        login(user, token);
+      const result = await authApi.login({ email, password });
+      if (result.mfaRequired) {
+        // Account has MFA enabled — switch to the OTP form and re-send the
+        // login request with `otp` once the user submits it.
+        setMfaStep(true);
+        setIsLoading(false);
+        return;
+      }
+      if (result.user && result.token) {
+        login(result.user, result.token);
         navigate('/dashboard');
       } else {
         setError('Authentication failed');
@@ -40,25 +46,27 @@ export const Login: React.FC = () => {
     }
   };
 
-  const handleMfaSubmit = (e: React.FormEvent) => {
+  const handleMfaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
 
-    setTimeout(() => {
-      if (mfaCode === '123456' || mfaCode.length === 6) {
-        login({
-          id: 'admin-uuid-0000-0000-000000000000',
-          name: 'System Administrator',
-          email: 'admin@platform.io',
-          role: 'admin',
-          clearance: 'TOP_SECRET'
-        }, 'mock-jwt-token-xyz');
+    try {
+      const result = await authApi.login({ email, password, otp: mfaCode });
+      if (result.user && result.token) {
+        login(result.user, result.token);
         navigate('/dashboard');
       } else {
-        setError('Invalid 2FA code. Hint: Use 123456');
+        setError('Verification failed');
         setIsLoading(false);
       }
-    }, 600);
+    } catch (err) {
+      const msg = axios.isAxiosError(err)
+        ? err.response?.data?.error?.message || err.message
+        : 'Invalid verification code';
+      setError(msg);
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -141,7 +149,6 @@ export const Login: React.FC = () => {
           <form onSubmit={handleMfaSubmit} className="space-y-4">
             <div className="text-center mb-6">
               <p className="text-sm text-gray-300">Enter your 6-digit MFA confirmation token</p>
-              <p className="text-xxs text-gray-500 mt-1">Hint: Enter 123456</p>
             </div>
 
             <div>
@@ -160,7 +167,11 @@ export const Login: React.FC = () => {
             <div className="flex gap-3 mt-6">
               <button
                 type="button"
-                onClick={() => setMfaStep(false)}
+                onClick={() => {
+                  setMfaStep(false);
+                  setMfaCode('');
+                  setError('');
+                }}
                 className="flex-1 py-2.5 border border-gray-800 rounded-lg text-sm font-semibold text-gray-400 hover:bg-gray-800/30 transition-all"
               >
                 Back
