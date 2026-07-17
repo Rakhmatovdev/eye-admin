@@ -15,6 +15,7 @@ import { Security } from '../pages/Security';
 import { Surveillance } from '../pages/Surveillance';
 import { Command } from '../pages/Command';
 import { ThreatIntel } from '../pages/ThreatIntel';
+import { Settings } from '../pages/Settings';
 
 export const router = createBrowserRouter([
   {
@@ -80,6 +81,10 @@ export const router = createBrowserRouter([
       {
         path: 'threat-intel',
         element: <ThreatIntel />,
+      },
+      {
+        path: 'settings',
+        element: <Settings />,
       },
     ],
   },

@@ -15,6 +15,7 @@ interface BackendUser {
   role: string;
   clearance_level: number;
   status: string;
+  mfa_enabled?: boolean;
 }
 
 // Mirrors backend internal/auth.LoginResponse. When `mfa_required` is true the
@@ -49,6 +50,7 @@ function mapUser(u: BackendUser): AuthUser {
     email: u.email,
     role: mapRole(u.role),
     clearance: mapClearance(u.clearance_level),
+    mfaEnabled: !!u.mfa_enabled,
   };
 }
 
@@ -58,7 +60,7 @@ export const authApi = {
   // `mfa_required: true` (no tokens) — the caller resubmits with `otp`.
   login: async (
     credentials: LoginCredentials
-  ): Promise<{ mfaRequired: boolean; user?: AuthUser; token?: string }> => {
+  ): Promise<{ mfaRequired: boolean; user?: AuthUser; token?: string; refreshToken?: string }> => {
     const res = await apiClient.post<{ data: LoginData }>('/v1/auth/login', credentials);
     const data = res.data.data;
     if (data.mfa_required) {
@@ -67,7 +69,12 @@ export const authApi = {
     if (!data.user || !data.access_token) {
       throw new Error('Malformed login response from server');
     }
-    return { mfaRequired: false, user: mapUser(data.user), token: data.access_token };
+    return {
+      mfaRequired: false,
+      user: mapUser(data.user),
+      token: data.access_token,
+      refreshToken: data.refresh_token,
+    };
   },
 
   logout: async (): Promise<void> => {
@@ -81,5 +88,40 @@ export const authApi = {
   getProfile: async (): Promise<AuthUser> => {
     const res = await apiClient.get<{ data: BackendUser }>('/v1/auth/me');
     return mapUser(res.data.data);
+  },
+
+  // POST /auth/change-password {current_password, new_password}. On success
+  // the backend revokes all refresh tokens for the account — the caller must
+  // force a re-login afterwards.
+  changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
+    await apiClient.post('/v1/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+  },
+};
+
+export interface MFAEnrollment {
+  secret: string;
+  otpauthUrl: string;
+}
+
+export const mfaApi = {
+  // POST /auth/mfa/enroll → {secret, otpauth_url}. Does not enable MFA yet —
+  // the caller must confirm with mfaApi.verify(otp).
+  enroll: async (): Promise<MFAEnrollment> => {
+    const res = await apiClient.post<{ data: { secret: string; otpauth_url: string } }>(
+      '/v1/auth/mfa/enroll'
+    );
+    const data = res.data.data;
+    return { secret: data.secret, otpauthUrl: data.otpauth_url };
+  },
+
+  verify: async (otp: string): Promise<void> => {
+    await apiClient.post('/v1/auth/mfa/verify', { otp });
+  },
+
+  disable: async (otp: string): Promise<void> => {
+    await apiClient.post('/v1/auth/mfa/disable', { otp });
   },
 };

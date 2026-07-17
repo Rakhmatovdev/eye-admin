@@ -26,6 +26,7 @@ export interface AuthUser {
   role: UserRole;
   clearance: ClearanceLevel;
   avatar?: string;
+  mfaEnabled?: boolean;
 }
 
 export interface Permission {

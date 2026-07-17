@@ -1,16 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ThreatFeedItem } from '../types';
 import { THREAT_FEED_SEED, generateThreatFeedItem } from '../api/security';
+import { useAuthStore } from '../store/authStore';
 
 // Derive the WS URL from the current hostname (not a baked-in env value) so
 // this also works when the admin panel is opened over LAN from another
 // machine, e.g. http://192.168.1.42:3000 -> ws://192.168.1.42:8080/ws.
-const resolveWsUrl = () => {
+// The backend requires a JWT on the query string (`?token=`) — without it the
+// connection is rejected outright.
+const resolveWsUrl = (token: string | null) => {
   const envUrl = (import.meta as any).env?.VITE_WS_URL as string | undefined;
-  if (envUrl) return envUrl;
-  const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-  return `ws://${host}:8080/ws`;
+  const base =
+    envUrl ||
+    `ws://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:8080/ws`;
+  if (!token) return base;
+  const separator = base.includes('?') ? '&' : '?';
+  return `${base}${separator}token=${encodeURIComponent(token)}`;
 };
+
+const BASE_BACKOFF_MS = 1000;
+const MAX_BACKOFF_MS = 30000;
 
 export type FeedLinkStatus = 'connecting' | 'live' | 'simulated';
 
@@ -18,7 +27,8 @@ export type FeedLinkStatus = 'connecting' | 'live' | 'simulated';
  * Streams the threat feed. Prefers the real backend WebSocket (`type: "threat"`
  * frames); if the backend is unreachable it falls back to a local simulation so
  * the Security Center is always demonstrable, but the connection badge always
- * reflects the true state.
+ * reflects the true state. Reconnects with exponential backoff (1s -> 30s cap,
+ * reset on a successful open) whenever the socket closes or errors.
  */
 export function useLiveThreatFeed(maxItems = 30) {
   const [feed, setFeed] = useState<ThreatFeedItem[]>(THREAT_FEED_SEED);
@@ -36,6 +46,8 @@ export function useLiveThreatFeed(maxItems = 30) {
     let ws: WebSocket | null = null;
     let simTimer: ReturnType<typeof setInterval> | null = null;
     let connectTimeout: ReturnType<typeof setTimeout> | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let backoff = BASE_BACKOFF_MS;
 
     const startSimulation = () => {
       if (simTimer || cancelled) return;
@@ -45,8 +57,34 @@ export function useLiveThreatFeed(maxItems = 30) {
       }, 2800 + Math.random() * 1800);
     };
 
-    try {
-      ws = new WebSocket(resolveWsUrl());
+    const stopSimulation = () => {
+      if (simTimer) {
+        clearInterval(simTimer);
+        simTimer = null;
+      }
+    };
+
+    const scheduleReconnect = () => {
+      if (cancelled || reconnectTimer) return;
+      const delay = backoff;
+      backoff = Math.min(backoff * 2, MAX_BACKOFF_MS);
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, delay);
+    };
+
+    const connect = () => {
+      if (cancelled) return;
+
+      try {
+        const token = useAuthStore.getState().token;
+        ws = new WebSocket(resolveWsUrl(token));
+      } catch {
+        startSimulation();
+        scheduleReconnect();
+        return;
+      }
 
       connectTimeout = setTimeout(() => {
         if (ws && ws.readyState !== WebSocket.OPEN) {
@@ -56,7 +94,12 @@ export function useLiveThreatFeed(maxItems = 30) {
 
       ws.onopen = () => {
         if (cancelled) return;
-        if (connectTimeout) clearTimeout(connectTimeout);
+        if (connectTimeout) {
+          clearTimeout(connectTimeout);
+          connectTimeout = null;
+        }
+        backoff = BASE_BACKOFF_MS; // reset backoff on a successful connection
+        stopSimulation();
         setStatus('live');
       };
 
@@ -88,16 +131,21 @@ export function useLiveThreatFeed(maxItems = 30) {
 
       ws.onclose = () => {
         if (cancelled) return;
-        setStatus((prev) => (prev === 'live' ? 'live' : 'simulated'));
+        if (connectTimeout) {
+          clearTimeout(connectTimeout);
+          connectTimeout = null;
+        }
         startSimulation();
+        scheduleReconnect();
       };
-    } catch {
-      startSimulation();
-    }
+    };
+
+    connect();
 
     return () => {
       cancelled = true;
       if (connectTimeout) clearTimeout(connectTimeout);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       if (simTimer) clearInterval(simTimer);
       ws?.close();
     };

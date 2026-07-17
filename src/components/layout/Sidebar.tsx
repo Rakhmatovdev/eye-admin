@@ -1,21 +1,23 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Users, 
-  ShieldCheck, 
-  Database, 
-  Binary, 
-  Activity, 
-  FileSpreadsheet, 
+import {
+  LayoutDashboard,
+  Users,
+  ShieldCheck,
+  Database,
+  Binary,
+  Activity,
+  FileSpreadsheet,
   Cpu,
   ShieldAlert,
   LogOut,
   Cctv,
   Crosshair,
-  Brain
+  Brain,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { useT } from '../../hooks/useT';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -25,20 +27,22 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
   const logout = useAuthStore(state => state.logout);
   const user = useAuthStore(state => state.user);
+  const t = useT();
 
   const menuItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'Users', path: '/users', icon: Users },
-    { name: 'Roles & RBAC', path: '/roles', icon: ShieldCheck },
-    { name: 'Data Sources', path: '/data-sources', icon: Database },
-    { name: 'Ontology', path: '/ontology', icon: Binary },
-    { name: 'Monitoring', path: '/monitoring', icon: Activity },
-    { name: 'Audit Logs', path: '/audit-logs', icon: FileSpreadsheet },
-    { name: 'Surveillance', path: '/surveillance', icon: Cctv },
-    { name: 'Command & Control', path: '/command', icon: Crosshair },
-    { name: 'Remote Agents', path: '/remote-agents', icon: Cpu },
-    { name: 'Security Center', path: '/security', icon: ShieldAlert },
-    { name: 'Threat Intel', path: '/threat-intel', icon: Brain },
+    { name: t('nav.dashboard'), path: '/dashboard', icon: LayoutDashboard },
+    { name: t('nav.users'), path: '/users', icon: Users },
+    { name: t('nav.roles'), path: '/roles', icon: ShieldCheck },
+    { name: t('nav.dataSources'), path: '/data-sources', icon: Database },
+    { name: t('nav.ontology'), path: '/ontology', icon: Binary },
+    { name: t('nav.monitoring'), path: '/monitoring', icon: Activity },
+    { name: t('nav.auditLogs'), path: '/audit-logs', icon: FileSpreadsheet },
+    { name: t('nav.surveillance'), path: '/surveillance', icon: Cctv },
+    { name: t('nav.command'), path: '/command', icon: Crosshair },
+    { name: t('nav.remoteAgents'), path: '/remote-agents', icon: Cpu },
+    { name: t('nav.security'), path: '/security', icon: ShieldAlert },
+    { name: t('nav.threatIntel'), path: '/threat-intel', icon: Brain },
+    { name: t('nav.settings'), path: '/settings', icon: SettingsIcon },
   ];
 
   return (
@@ -97,7 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => 
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-950/20 transition-all"
         >
           <LogOut size={18} />
-          {!collapsed && <span>Logout</span>}
+          {!collapsed && <span>{t('nav.logout')}</span>}
         </button>
       </div>
     </aside>

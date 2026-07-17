@@ -1,6 +1,7 @@
 import React from 'react';
 import { Menu, Bell, Shield, Search } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { LocaleSwitcher } from '../ui/LocaleSwitcher';
 
 interface TopbarProps {
   collapsed: boolean;
@@ -34,6 +35,8 @@ export const Topbar: React.FC<TopbarProps> = ({ collapsed, setCollapsed }) => {
       </div>
 
       <div className="flex items-center gap-4">
+        <LocaleSwitcher />
+
         {/* Clearance Level */}
         {user && (
           <div className="flex items-center gap-1.5 bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 px-2.5 py-1 rounded-full text-xs font-semibold">
