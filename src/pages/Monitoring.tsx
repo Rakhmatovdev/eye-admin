@@ -14,6 +14,7 @@ import { Cpu, HardDrive, Network } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { monitoringApi } from '../api/monitoring';
 import type { ServiceStatus } from '../types';
+import { useT } from '../hooks/useT';
 
 interface MetricNode {
   time: string;
@@ -30,6 +31,7 @@ function statusDotClass(status: ServiceStatus['status']): string {
 }
 
 export const Monitoring: React.FC = () => {
+  const t = useT();
   const { data: services = [] } = useQuery({
     queryKey: ['monitoring', 'services'],
     queryFn: () => monitoringApi.getServices(),
@@ -60,9 +62,9 @@ export const Monitoring: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            Real-time Telemetry <span className="live-dot w-2 h-2 bg-green-500 rounded-full" />
+            {t('monitoring.title')} <span className="live-dot w-2 h-2 bg-green-500 rounded-full" />
           </h1>
-          <p className="text-gray-400 text-sm mt-1">Monitor operational load metrics, memory buffers, service pings, and database connection pools.</p>
+          <p className="text-gray-400 text-sm mt-1">{t('monitoring.subtitle')}</p>
         </div>
       </div>
 
@@ -73,7 +75,7 @@ export const Monitoring: React.FC = () => {
             <HardDrive size={22} />
           </div>
           <div>
-            <p className="text-xxs text-gray-500 uppercase font-semibold">Memory usage</p>
+            <p className="text-xxs text-gray-500 uppercase font-semibold">{t('monitoring.memoryUsage')}</p>
             <h3 className="text-2xl font-extrabold text-white">{memoryUsage}%</h3>
           </div>
         </div>
@@ -82,7 +84,7 @@ export const Monitoring: React.FC = () => {
             <Cpu size={22} />
           </div>
           <div>
-            <p className="text-xxs text-gray-500 uppercase font-semibold">Heap allocated</p>
+            <p className="text-xxs text-gray-500 uppercase font-semibold">{t('monitoring.heapAllocated')}</p>
             <h3 className="text-2xl font-extrabold text-white">{heapMb} MB</h3>
           </div>
         </div>
@@ -91,7 +93,7 @@ export const Monitoring: React.FC = () => {
             <Network size={22} />
           </div>
           <div>
-            <p className="text-xxs text-gray-500 uppercase font-semibold">Active goroutines</p>
+            <p className="text-xxs text-gray-500 uppercase font-semibold">{t('monitoring.activeGoroutines')}</p>
             <h3 className="text-2xl font-extrabold text-white">{goroutines}</h3>
           </div>
         </div>
@@ -100,7 +102,7 @@ export const Monitoring: React.FC = () => {
       {/* Charts section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="glass p-5 rounded-2xl border border-gray-800">
-          <h4 className="text-base font-bold text-white mb-4">Memory Usage % (Real-time)</h4>
+          <h4 className="text-base font-bold text-white mb-4">{t('monitoring.memoryChartTitle')}</h4>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={metrics}>
@@ -115,7 +117,7 @@ export const Monitoring: React.FC = () => {
         </div>
 
         <div className="glass p-5 rounded-2xl border border-gray-800">
-          <h4 className="text-base font-bold text-white mb-4">Goroutine Count (Real-time)</h4>
+          <h4 className="text-base font-bold text-white mb-4">{t('monitoring.goroutineChartTitle')}</h4>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={metrics}>
@@ -132,7 +134,7 @@ export const Monitoring: React.FC = () => {
 
       {/* Services status */}
       <div className="glass p-6 rounded-2xl border border-gray-800">
-        <h4 className="text-base font-bold text-white mb-4">Node Operations & Service Status</h4>
+        <h4 className="text-base font-bold text-white mb-4">{t('monitoring.serviceStatusTitle')}</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {services.map((srv) => (
             <div key={srv.id} className="bg-gray-950/40 p-4 border border-gray-800/40 rounded-xl space-y-2 flex flex-col justify-between">
@@ -141,8 +143,8 @@ export const Monitoring: React.FC = () => {
                 <span className={`w-2.5 h-2.5 rounded-full live-dot inline-block ${statusDotClass(srv.status)}`} />
               </div>
               <div className="flex justify-between text-xs text-gray-500 pt-2 border-t border-gray-800/30">
-                <span>Uptime: {srv.uptime}%</span>
-                <span>Latency: {srv.responseTime}ms</span>
+                <span>{t('monitoring.uptimeLabel')} {srv.uptime}%</span>
+                <span>{t('monitoring.latencyLabel')} {srv.responseTime}ms</span>
               </div>
             </div>
           ))}

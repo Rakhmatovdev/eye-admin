@@ -25,8 +25,10 @@ import { sensorsApi } from '../api/sensors';
 import { militaryApi } from '../api/military';
 import { usersApi } from '../api/users';
 import { entitiesApi } from '../api/entities';
+import { useT } from '../hooks/useT';
 
 export const Dashboard: React.FC = () => {
+  const t = useT();
   // Live platform metrics (fall back gracefully inside each api on error).
   const { data: sensorStats } = useQuery({ queryKey: ['dash-sensors'], queryFn: sensorsApi.stats });
   const { data: milStats } = useQuery({ queryKey: ['dash-mil'], queryFn: militaryApi.stats });
@@ -34,10 +36,10 @@ export const Dashboard: React.FC = () => {
   const { data: entityTypes } = useQuery({ queryKey: ['dash-types'], queryFn: entitiesApi.getEntityTypes });
 
   const stats = [
-    { name: 'Total Users', value: users ? String(users.length) : '—', icon: Users, trend: 'live', up: true, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { name: 'Sensors Online', value: sensorStats ? `${sensorStats.online}/${sensorStats.total}` : '—', icon: Activity, trend: `${sensorStats?.degraded ?? 0} deg`, up: true, color: 'text-green-500', bg: 'bg-green-500/10' },
-    { name: 'Threat Tracks', value: milStats ? String(milStats.threats) : '—', icon: ShieldAlert, trend: `${milStats?.critical_threats ?? 0} crit`, up: false, color: 'text-red-500', bg: 'bg-red-500/10' },
-    { name: 'Active Missions', value: milStats ? String(milStats.active_missions) : '—', icon: Layers, trend: 'ops', up: true, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+    { name: t('dashboard.statTotalUsers'), value: users ? String(users.length) : '—', icon: Users, trend: 'live', up: true, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { name: t('dashboard.statSensorsOnline'), value: sensorStats ? `${sensorStats.online}/${sensorStats.total}` : '—', icon: Activity, trend: `${sensorStats?.degraded ?? 0} deg`, up: true, color: 'text-green-500', bg: 'bg-green-500/10' },
+    { name: t('dashboard.statThreatTracks'), value: milStats ? String(milStats.threats) : '—', icon: ShieldAlert, trend: `${milStats?.critical_threats ?? 0} crit`, up: false, color: 'text-red-500', bg: 'bg-red-500/10' },
+    { name: t('dashboard.statActiveMissions'), value: milStats ? String(milStats.active_missions) : '—', icon: Layers, trend: 'ops', up: true, color: 'text-purple-500', bg: 'bg-purple-500/10' },
   ];
 
   // Mock Traffic Data
@@ -68,13 +70,13 @@ export const Dashboard: React.FC = () => {
         <div className="absolute right-0 top-0 w-96 h-96 bg-blue-600/5 rounded-full blur-3xl" />
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            System Operations Dashboard <span className="live-dot w-2.5 h-2.5 bg-green-500 rounded-full inline-block" />
+            {t('dashboard.title')} <span className="live-dot w-2.5 h-2.5 bg-green-500 rounded-full inline-block" />
           </h1>
-          <p className="text-gray-400 text-sm mt-1">Real-time status overview of nodes, telemetry, security threats and user access logs.</p>
+          <p className="text-gray-400 text-sm mt-1">{t('dashboard.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2 bg-gray-800/80 px-4 py-2 rounded-xl border border-gray-700/50">
           <TrendingUp size={16} className="text-blue-400" />
-          <span className="text-xs font-semibold text-gray-300">All Nodes Operational</span>
+          <span className="text-xs font-semibold text-gray-300">{t('dashboard.allNodesOperational')}</span>
         </div>
       </div>
 
@@ -94,7 +96,7 @@ export const Dashboard: React.FC = () => {
                     <ArrowDownRight size={14} className="text-red-500" />
                   )}
                   <span className={`text-xs font-bold ${stat.up ? 'text-green-500' : 'text-red-500'}`}>{stat.trend}</span>
-                  <span className="text-xxs text-gray-500 font-medium">vs last month</span>
+                  <span className="text-xxs text-gray-500 font-medium">{t('dashboard.vsLastMonth')}</span>
                 </div>
               </div>
               <div className={`w-12 h-12 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center border border-gray-800`}>
@@ -108,7 +110,7 @@ export const Dashboard: React.FC = () => {
       {/* Chart Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 glass p-5 rounded-2xl border border-gray-800">
-          <h4 className="text-base font-bold text-white mb-4">Operations Traffic (API Load)</h4>
+          <h4 className="text-base font-bold text-white mb-4">{t('dashboard.trafficTitle')}</h4>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trafficData}>
@@ -130,7 +132,7 @@ export const Dashboard: React.FC = () => {
 
         <div className="glass p-5 rounded-2xl border border-gray-800 flex flex-col justify-between">
           <div>
-            <h4 className="text-base font-bold text-white mb-4">Ontology Node Classes</h4>
+            <h4 className="text-base font-bold text-white mb-4">{t('dashboard.ontologyChartTitle')}</h4>
             <div className="h-60 flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -168,14 +170,14 @@ export const Dashboard: React.FC = () => {
         {/* Recent Incidents */}
         <div className="glass p-5 rounded-2xl border border-gray-800">
           <h4 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-            Threat & Alert Indicators <span className="live-dot-red w-2 h-2 bg-red-500 rounded-full" />
+            {t('dashboard.threatIndicatorsTitle')} <span className="live-dot-red w-2 h-2 bg-red-500 rounded-full" />
           </h4>
           <div className="divide-y divide-gray-800 space-y-3">
             {recentIncidents.map(inc => (
               <div key={inc.id} className="pt-3 flex items-center justify-between text-sm">
                 <div>
                   <h5 className="font-semibold text-gray-200">{inc.title}</h5>
-                  <p className="text-xs text-gray-500">Target: {inc.target} • {inc.time}</p>
+                  <p className="text-xs text-gray-500">{t('dashboard.targetLabel')} {inc.target} • {inc.time}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`px-2.5 py-0.5 rounded-full text-xxs font-bold ${
@@ -194,7 +196,7 @@ export const Dashboard: React.FC = () => {
 
         {/* System Node Telemetry */}
         <div className="glass p-5 rounded-2xl border border-gray-800">
-          <h4 className="text-base font-bold text-white mb-4">Core Node Services</h4>
+          <h4 className="text-base font-bold text-white mb-4">{t('dashboard.coreNodeServicesTitle')}</h4>
           <div className="space-y-3.5">
             {[
               { name: 'PostgreSQL Relational DB', status: 'Healthy', ping: '12ms' },

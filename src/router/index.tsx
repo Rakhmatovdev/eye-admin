@@ -3,6 +3,8 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AuthGuard } from '../components/guards/AuthGuard';
 import { AppLayout } from '../components/layout/AppLayout';
 import { Login } from '../pages/Login';
+import { ForgotPassword } from '../pages/ForgotPassword';
+import { ResetPassword } from '../pages/ResetPassword';
 import { Dashboard } from '../pages/Dashboard';
 import { Users } from '../pages/Users';
 import { Roles } from '../pages/Roles';
@@ -21,6 +23,14 @@ export const router = createBrowserRouter([
   {
     path: '/login',
     element: <Login />,
+  },
+  {
+    path: '/forgot-password',
+    element: <ForgotPassword />,
+  },
+  {
+    path: '/reset-password',
+    element: <ResetPassword />,
   },
   {
     path: '/',

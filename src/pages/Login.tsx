@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { ShieldAlert, KeyRound, Mail, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { authApi } from '../api/auth';
@@ -148,7 +148,12 @@ export const Login: React.FC = () => {
               {isLoading ? t('login.submitting') : t('login.submit')}
               <ArrowRight size={16} />
             </button>
-            <div className="text-center mt-4">
+            <div className="text-center mt-3">
+              <Link to="/forgot-password" className="text-xxs text-gray-500 hover:text-blue-400 transition-all">
+                {t('login.forgotLink')}
+              </Link>
+            </div>
+            <div className="text-center mt-3">
               <span className="text-xxs text-gray-500">{t('login.demoUser')}</span>
             </div>
           </form>

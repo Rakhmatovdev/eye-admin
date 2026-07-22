@@ -21,6 +21,7 @@ import { IncidentDrawer } from '../components/security/IncidentDrawer';
 import { VulnerabilitiesPanel } from '../components/security/VulnerabilitiesPanel';
 import { BlocklistPanel } from '../components/security/BlocklistPanel';
 import { AttackMap } from '../components/security/AttackMap';
+import { useT } from '../hooks/useT';
 
 type TabKey = 'overview' | 'incidents' | 'vulnerabilities' | 'attackmap' | 'blocklist';
 
@@ -32,6 +33,7 @@ const SEVERITY_WEIGHT: Record<SecurityIncident['severity'], number> = {
 };
 
 export const Security: React.FC = () => {
+  const t = useT();
   const [loading, setLoading] = useState(true);
   const [incidents, setIncidents] = useState<SecurityIncident[]>([]);
   const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([]);
@@ -102,11 +104,11 @@ export const Security: React.FC = () => {
   }, []);
 
   const tabs: { key: TabKey; label: string; icon: React.ElementType; count?: number }[] = [
-    { key: 'overview', label: 'Overview', icon: Gauge },
-    { key: 'incidents', label: 'Incidents', icon: ShieldAlert, count: incidents.filter((i) => i.status !== 'resolved').length },
-    { key: 'vulnerabilities', label: 'Vulnerabilities', icon: Bug, count: vulnerabilities.filter((v) => v.status === 'open' || v.status === 'patching').length },
-    { key: 'attackmap', label: 'Attack Map', icon: Globe2 },
-    { key: 'blocklist', label: 'Blocklist', icon: Ban, count: blocklist.length },
+    { key: 'overview', label: t('security.tabOverview'), icon: Gauge },
+    { key: 'incidents', label: t('security.tabIncidents'), icon: ShieldAlert, count: incidents.filter((i) => i.status !== 'resolved').length },
+    { key: 'vulnerabilities', label: t('security.tabVulnerabilities'), icon: Bug, count: vulnerabilities.filter((v) => v.status === 'open' || v.status === 'patching').length },
+    { key: 'attackmap', label: t('security.tabAttackMap'), icon: Globe2 },
+    { key: 'blocklist', label: t('security.tabBlocklist'), icon: Ban, count: blocklist.length },
   ];
 
   return (
@@ -115,11 +117,11 @@ export const Security: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            Security Operations Center
+            {t('security.title')}
             <span className="live-dot-red w-2 h-2 bg-red-500 rounded-full" />
           </h1>
           <p className="text-gray-400 text-sm mt-1">
-            SIEM-driven threat detection, vulnerability management, and edge defense — real-time posture across the platform.
+            {t('security.subtitle')}
           </p>
         </div>
         <button
@@ -127,7 +129,7 @@ export const Security: React.FC = () => {
           className="flex items-center gap-2 px-3.5 py-2 bg-gray-900 border border-gray-800 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:border-gray-700 transition-all shrink-0"
         >
           <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} />
-          Refresh · {lastRefreshed.toLocaleTimeString()}
+          {t('security.refreshLabel')} {lastRefreshed.toLocaleTimeString()}
         </button>
       </div>
 
@@ -140,11 +142,11 @@ export const Security: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 w-full">
               {[
-                { name: 'Critical Open', value: overview.criticalOpen, icon: ShieldAlert, color: 'text-red-500', bg: 'bg-red-500/10' },
-                { name: 'High Open', value: overview.highOpen, icon: AlertTriangle, color: 'text-orange-500', bg: 'bg-orange-500/10' },
-                { name: 'Open Incidents', value: overview.openIncidents, icon: Gauge, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-                { name: 'Open Vulns', value: overview.openVulnerabilities, icon: Bug, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-                { name: 'Blocked Entities', value: overview.blockedCount, icon: Ban, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
+                { name: t('security.statCriticalOpen'), value: overview.criticalOpen, icon: ShieldAlert, color: 'text-red-500', bg: 'bg-red-500/10' },
+                { name: t('security.statHighOpen'), value: overview.highOpen, icon: AlertTriangle, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+                { name: t('security.statOpenIncidents'), value: overview.openIncidents, icon: Gauge, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+                { name: t('security.statOpenVulns'), value: overview.openVulnerabilities, icon: Bug, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+                { name: t('security.statBlockedEntities'), value: overview.blockedCount, icon: Ban, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
               ].map((stat) => {
                 const Icon = stat.icon;
                 return (
@@ -162,7 +164,7 @@ export const Security: React.FC = () => {
                   <CheckCircle2 size={15} />
                 </div>
                 <h3 className="text-xl font-extrabold text-white count-up">{overview.mttr}</h3>
-                <p className="text-xxs text-gray-500 uppercase font-semibold mt-0.5">Mean Time to Resolve</p>
+                <p className="text-xxs text-gray-500 uppercase font-semibold mt-0.5">{t('security.mttrLabel')}</p>
               </div>
             </div>
           </>
@@ -209,8 +211,8 @@ export const Security: React.FC = () => {
                 </div>
                 <div className="glass rounded-2xl border border-gray-800 overflow-hidden">
                   <div className="p-4 border-b border-gray-800">
-                    <h3 className="text-sm font-bold text-white">Priority Incidents</h3>
-                    <p className="text-xxs text-gray-500 mt-0.5">Highest-severity open incidents requiring attention</p>
+                    <h3 className="text-sm font-bold text-white">{t('security.priorityIncidents')}</h3>
+                    <p className="text-xxs text-gray-500 mt-0.5">{t('security.priorityIncidentsHint')}</p>
                   </div>
                   <div className="divide-y divide-gray-800/60">
                     {topOpenIncidents.map((inc) => (
@@ -237,7 +239,7 @@ export const Security: React.FC = () => {
                       </button>
                     ))}
                     {topOpenIncidents.length === 0 && (
-                      <p className="text-xs text-gray-500 text-center py-6">All clear — no priority incidents open.</p>
+                      <p className="text-xs text-gray-500 text-center py-6">{t('security.noPriorityIncidents')}</p>
                     )}
                   </div>
                 </div>

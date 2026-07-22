@@ -16,8 +16,10 @@ interface AuthState {
   setMfaRequired: (required: boolean, mfaToken?: string) => void;
   updateUser: (updates: Partial<AuthUser>) => void;
   /** Swap in a freshly-minted access token after a silent refresh, without
-   * touching the rest of the session (used by the client.ts 401 interceptor). */
-  setAccessToken: (token: string) => void;
+   * touching the rest of the session (used by the client.ts 401 interceptor).
+   * The backend rotates the refresh token on every /auth/refresh, so the new
+   * one must be persisted too — the old one is already revoked server-side. */
+  setAccessToken: (token: string, refreshToken?: string | null) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -63,7 +65,11 @@ export const useAuthStore = create<AuthState>()(
           user: state.user ? { ...state.user, ...updates } : null,
         })),
 
-      setAccessToken: (token) => set({ token }),
+      setAccessToken: (token, refreshToken) =>
+        set((state) => ({
+          token,
+          refreshToken: refreshToken ?? state.refreshToken,
+        })),
     }),
     {
       name: 'nexus-auth',

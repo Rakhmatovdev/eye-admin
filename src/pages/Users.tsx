@@ -3,8 +3,10 @@ import { Plus, Search, Filter, ShieldAlert, Check, Trash } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '../api/users';
 import type { ClearanceLevel, User, UserRole } from '../types';
+import { useT } from '../hooks/useT';
 
 export const Users: React.FC = () => {
+  const t = useT();
   const queryClient = useQueryClient();
 
   const { data: users = [], isLoading } = useQuery({
@@ -61,7 +63,7 @@ export const Users: React.FC = () => {
   };
 
   const handleDeleteUser = (id: string) => {
-    if (confirm('Are you sure you want to delete this identity?')) {
+    if (confirm(t('users.confirmDelete'))) {
       deleteMutation.mutate(id);
     }
   };
@@ -77,15 +79,15 @@ export const Users: React.FC = () => {
       {/* Title Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Identity Governance</h1>
-          <p className="text-gray-400 text-sm mt-1">Manage personnel registry, active authentication states, and clearance levels.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">{t('users.title')}</h1>
+          <p className="text-gray-400 text-sm mt-1">{t('users.subtitle')}</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
           className="btn-primary px-4 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2"
         >
           <Plus size={16} />
-          <span>Provision User</span>
+          <span>{t('users.provisionUser')}</span>
         </button>
       </div>
 
@@ -97,7 +99,7 @@ export const Users: React.FC = () => {
           </span>
           <input
             type="text"
-            placeholder="Search by name, email, or department..."
+            placeholder={t('users.searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-sm text-gray-300 placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-all"
@@ -105,7 +107,7 @@ export const Users: React.FC = () => {
         </div>
         <button className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-sm text-gray-400 hover:text-gray-200">
           <Filter size={16} />
-          <span>Filters</span>
+          <span>{t('users.filters')}</span>
         </button>
       </div>
 
@@ -115,24 +117,24 @@ export const Users: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-gray-800 bg-gray-950/40 text-gray-400 text-xs font-semibold uppercase tracking-wider">
-                <th className="p-4">Name / ID</th>
-                <th className="p-4">Clearance</th>
-                <th className="p-4">Department</th>
-                <th className="p-4">Role</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Last Login</th>
-                <th className="p-4 text-right">Access Control</th>
+                <th className="p-4">{t('users.table.name')}</th>
+                <th className="p-4">{t('users.table.clearance')}</th>
+                <th className="p-4">{t('users.table.department')}</th>
+                <th className="p-4">{t('users.table.role')}</th>
+                <th className="p-4">{t('users.table.status')}</th>
+                <th className="p-4">{t('users.table.lastLogin')}</th>
+                <th className="p-4 text-right">{t('users.table.accessControl')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800/60">
               {isLoading && (
                 <tr>
-                  <td colSpan={7} className="p-6 text-center text-sm text-gray-500">Loading identities…</td>
+                  <td colSpan={7} className="p-6 text-center text-sm text-gray-500">{t('users.loadingIdentities')}</td>
                 </tr>
               )}
               {!isLoading && filteredUsers.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-6 text-center text-sm text-gray-500">No users found.</td>
+                  <td colSpan={7} className="p-6 text-center text-sm text-gray-500">{t('users.noUsersFound')}</td>
                 </tr>
               )}
               {filteredUsers.map(user => (
@@ -175,7 +177,7 @@ export const Users: React.FC = () => {
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => handleToggleStatus(user)}
-                        title={user.status === 'active' ? 'Suspend Access' : 'Activate Access'}
+                        title={user.status === 'active' ? t('users.suspendAccess') : t('users.activateAccess')}
                         className={`p-1.5 rounded-lg border transition-all ${
                           user.status === 'active'
                             ? 'bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20'
@@ -186,7 +188,7 @@ export const Users: React.FC = () => {
                       </button>
                       <button
                         onClick={() => handleDeleteUser(user.id)}
-                        title="Revoke Identity"
+                        title={t('users.revokeIdentity')}
                         className="p-1.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-all"
                       >
                         <Trash size={14} />
@@ -205,68 +207,68 @@ export const Users: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
           <div className="glass w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-gray-800">
             <div className="p-6 border-b border-gray-800 bg-gray-950/50">
-              <h3 className="text-lg font-bold text-white">Provision System Identity</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Initialize credentials and link clearance bounds.</p>
+              <h3 className="text-lg font-bold text-white">{t('users.modalTitle')}</h3>
+              <p className="text-xs text-gray-500 mt-0.5">{t('users.modalSubtitle')}</p>
             </div>
             <form onSubmit={handleCreateUser} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">Full Name</label>
+                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">{t('users.fullName')}</label>
                   <input
                     type="text"
                     required
                     value={newName}
                     onChange={e => setNewName(e.target.value)}
                     className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-blue-500"
-                    placeholder="Enter user full name..."
+                    placeholder={t('users.fullNamePlaceholder')}
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">System Email</label>
+                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">{t('users.systemEmail')}</label>
                   <input
                     type="email"
                     required
                     value={newEmail}
                     onChange={e => setNewEmail(e.target.value)}
                     className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-blue-500"
-                    placeholder="e.g. user@nexus.io"
+                    placeholder={t('users.emailPlaceholder')}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">System Role</label>
+                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">{t('users.systemRole')}</label>
                   <select
                     value={newRole}
                     onChange={e => setNewRole(e.target.value as UserRole)}
                     className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-blue-500"
                   >
-                    <option value="admin">Administrator</option>
-                    <option value="analyst">Analyst</option>
-                    <option value="viewer">Viewer</option>
-                    <option value="operator">Operator</option>
+                    <option value="admin">{t('users.roleAdmin')}</option>
+                    <option value="analyst">{t('users.roleAnalyst')}</option>
+                    <option value="viewer">{t('users.roleViewer')}</option>
+                    <option value="operator">{t('users.roleOperator')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">Clearance Class</label>
+                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">{t('users.clearanceClass')}</label>
                   <select
                     value={newClearance}
                     onChange={e => setNewClearance(e.target.value as ClearanceLevel)}
                     className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-blue-500"
                   >
-                    <option value="TOP_SECRET">Top Secret</option>
-                    <option value="SECRET">Secret</option>
-                    <option value="CONFIDENTIAL">Confidential</option>
-                    <option value="UNCLASSIFIED">Unclassified</option>
+                    <option value="TOP_SECRET">{t('users.clearanceTopSecret')}</option>
+                    <option value="SECRET">{t('users.clearanceSecret')}</option>
+                    <option value="CONFIDENTIAL">{t('users.clearanceConfidential')}</option>
+                    <option value="UNCLASSIFIED">{t('users.clearanceUnclassified')}</option>
                   </select>
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">Department</label>
+                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">{t('users.table.department')}</label>
                   <input
                     type="text"
                     required
                     value={newDepartment}
                     onChange={e => setNewDepartment(e.target.value)}
                     className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-blue-500"
-                    placeholder="e.g. Threat Intel / Ops"
+                    placeholder={t('users.departmentPlaceholder')}
                   />
                 </div>
               </div>
@@ -277,14 +279,14 @@ export const Users: React.FC = () => {
                   onClick={() => setShowCreateModal(false)}
                   className="px-4 py-2 border border-gray-800 rounded-xl text-sm font-semibold text-gray-400 hover:bg-gray-800/30 transition-all"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={createMutation.isPending}
                   className="btn-primary px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
                 >
-                  {createMutation.isPending ? 'Provisioning…' : 'Provision User'}
+                  {createMutation.isPending ? t('users.provisioning') : t('users.provisionUser')}
                 </button>
               </div>
             </form>

@@ -3,8 +3,10 @@ import { Shield, Check, Save } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { rolesApi } from '../api/roles';
 import type { Role } from '../types';
+import { useT } from '../hooks/useT';
 
 export const Roles: React.FC = () => {
+  const t = useT();
   const queryClient = useQueryClient();
 
   const { data: roles = [], isLoading: rolesLoading } = useQuery({
@@ -58,7 +60,7 @@ export const Roles: React.FC = () => {
   };
 
   const handleSaveMatrix = () => {
-    alert('RBAC Access Policies Updated Successfully!');
+    alert(t('roles.saveSuccessAlert'));
   };
 
   const categories = useMemo(() => {
@@ -76,24 +78,24 @@ export const Roles: React.FC = () => {
       {/* Title Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">RBAC Permissions Matrix</h1>
-          <p className="text-gray-400 text-sm mt-1">Configure role privileges, link access boundaries, and review access policy rules.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">{t('roles.title')}</h1>
+          <p className="text-gray-400 text-sm mt-1">{t('roles.subtitle')}</p>
         </div>
         <button
           onClick={handleSaveMatrix}
           className="btn-primary px-4 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2"
         >
           <Save size={16} />
-          <span>Save Changes</span>
+          <span>{t('roles.saveChanges')}</span>
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Roles List */}
         <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Access Roles</h4>
+          <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">{t('roles.accessRoles')}</h4>
           {rolesLoading && (
-            <div className="text-sm text-gray-500 p-4">Loading roles…</div>
+            <div className="text-sm text-gray-500 p-4">{t('roles.loadingRoles')}</div>
           )}
           {roles.map(role => (
             <button
@@ -122,9 +124,9 @@ export const Roles: React.FC = () => {
         <div className="lg:col-span-2 glass p-6 rounded-2xl border border-gray-800 space-y-6">
           <div>
             <h4 className="text-base font-bold text-white">
-              Privileges for: {currentRole?.displayName ?? '—'}
+              {t('roles.privilegesFor')} {currentRole?.displayName ?? '—'}
             </h4>
-            <p className="text-xs text-gray-500 mt-0.5">Toggle check boxes to instantly provision/revoke role capability.</p>
+            <p className="text-xs text-gray-500 mt-0.5">{t('roles.toggleHint')}</p>
           </div>
 
           <div className="space-y-6 overflow-y-auto max-h-[500px] pr-2">
@@ -146,7 +148,7 @@ export const Roles: React.FC = () => {
                         >
                           <div className="space-y-0.5">
                             <p className="text-sm font-semibold text-gray-300">{perm.name}</p>
-                            <p className="text-xxs text-gray-500 font-medium">Capability key: {perm.key}</p>
+                            <p className="text-xxs text-gray-500 font-medium">{t('roles.capabilityKeyLabel')} {perm.key}</p>
                           </div>
                           <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
                             hasPerm

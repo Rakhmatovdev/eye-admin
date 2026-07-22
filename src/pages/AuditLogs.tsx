@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Search, Download, AlertCircle, CheckCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { auditApi } from '../api/audit';
+import { useT } from '../hooks/useT';
 
 export const AuditLogs: React.FC = () => {
+  const t = useT();
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ['audit', 'logs'],
     queryFn: () => auditApi.getLogs(),
@@ -35,16 +37,16 @@ export const AuditLogs: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            Immutable Audit Trail <span className="text-xxs font-bold bg-blue-600/10 border border-blue-500/20 text-blue-400 px-2.5 py-0.5 rounded-full">HASH-CHAINED</span>
+            {t('auditLogs.title')} <span className="text-xxs font-bold bg-blue-600/10 border border-blue-500/20 text-blue-400 px-2.5 py-0.5 rounded-full">{t('auditLogs.hashChainedBadge')}</span>
           </h1>
-          <p className="text-gray-400 text-sm mt-1">Hashed transaction logs record every user session, configuration shift, and query request.</p>
+          <p className="text-gray-400 text-sm mt-1">{t('auditLogs.subtitle')}</p>
         </div>
         <button
           onClick={handleExportCSV}
           className="btn-primary px-4 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2"
         >
           <Download size={16} />
-          <span>Export Logs</span>
+          <span>{t('auditLogs.exportLogs')}</span>
         </button>
       </div>
 
@@ -55,7 +57,7 @@ export const AuditLogs: React.FC = () => {
         </span>
         <input
           type="text"
-          placeholder="Filter audit logs by identity, capability, resource, or IP address..."
+          placeholder={t('auditLogs.searchPlaceholder')}
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="w-full pl-10 pr-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-sm text-gray-300 placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-all"
@@ -68,24 +70,24 @@ export const AuditLogs: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-gray-800 bg-gray-950/40 text-gray-400 text-xs font-semibold uppercase tracking-wider">
-                <th className="p-4">Timestamp</th>
-                <th className="p-4">Identity</th>
-                <th className="p-4">Capability Action</th>
-                <th className="p-4">Resource</th>
-                <th className="p-4">IP Address</th>
-                <th className="p-4">Result</th>
-                <th className="p-4">Cryptographic Hash</th>
+                <th className="p-4">{t('auditLogs.table.timestamp')}</th>
+                <th className="p-4">{t('auditLogs.table.identity')}</th>
+                <th className="p-4">{t('auditLogs.table.capabilityAction')}</th>
+                <th className="p-4">{t('auditLogs.table.resource')}</th>
+                <th className="p-4">{t('auditLogs.table.ipAddress')}</th>
+                <th className="p-4">{t('auditLogs.table.result')}</th>
+                <th className="p-4">{t('auditLogs.table.cryptographicHash')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800/60 font-mono text-xs">
               {isLoading && (
                 <tr>
-                  <td colSpan={7} className="p-6 text-center text-gray-500">Loading audit trail...</td>
+                  <td colSpan={7} className="p-6 text-center text-gray-500">{t('auditLogs.loadingAuditTrail')}</td>
                 </tr>
               )}
               {!isLoading && filteredLogs.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-6 text-center text-gray-500">No audit log entries match this filter.</td>
+                  <td colSpan={7} className="p-6 text-center text-gray-500">{t('auditLogs.noEntriesMatch')}</td>
                 </tr>
               )}
               {filteredLogs.map(log => (
@@ -103,7 +105,7 @@ export const AuditLogs: React.FC = () => {
                       {log.result}
                     </span>
                   </td>
-                  <td className="p-4 text-gray-600 select-all" title="Full hash matches previous block signature">{log.hash}</td>
+                  <td className="p-4 text-gray-600 select-all" title={t('auditLogs.hashTooltip')}>{log.hash}</td>
                 </tr>
               ))}
             </tbody>

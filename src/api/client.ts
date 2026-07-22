@@ -28,9 +28,14 @@ type RetriableConfig = AxiosRequestConfig & { _retry?: boolean };
 
 // Endpoints that must never trigger (or be retried through) a silent refresh —
 // a 401 on these means the credentials/refresh token themselves are invalid.
-function isAuthEndpoint(url?: string): boolean {
+export function isAuthEndpoint(url?: string): boolean {
   if (!url) return false;
-  return url.includes('/v1/auth/refresh') || url.includes('/v1/auth/login');
+  return (
+    url.includes('/v1/auth/refresh') ||
+    url.includes('/v1/auth/login') ||
+    url.includes('/v1/auth/forgot-password') ||
+    url.includes('/v1/auth/reset-password')
+  );
 }
 
 // Single-flight refresh: concurrent 401s share one in-flight `/auth/refresh`
@@ -48,7 +53,10 @@ async function performRefresh(): Promise<string | null> {
     });
     const accessToken = res.data?.data?.access_token as string | undefined;
     if (!accessToken) return null;
-    useAuthStore.getState().setAccessToken(accessToken);
+    // The backend rotates the refresh token on every refresh — persist the
+    // new one or the next silent refresh would fail against the revoked one.
+    const newRefreshToken = res.data?.data?.refresh_token as string | undefined;
+    useAuthStore.getState().setAccessToken(accessToken, newRefreshToken ?? null);
     return accessToken;
   } catch {
     return null;

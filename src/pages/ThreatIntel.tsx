@@ -27,6 +27,8 @@ import { securityApi } from '../api/security';
 import { sensorsApi } from '../api/sensors';
 import { militaryApi } from '../api/military';
 import type { SecurityIncident } from '../types';
+import { useT } from '../hooks/useT';
+import type { TKey } from '../lib/i18n';
 
 // ---------------------------------------------------------------------------
 // AI-style correlation engine — a client-side heuristic that fuses signals
@@ -51,12 +53,12 @@ interface Finding {
   sourceCount: number;
 }
 
-const CATEGORY_META: Record<FindingCategory, { label: string; icon: LucideIcon; color: string }> = {
-  'biometric-hit': { label: 'Biometric Hit', icon: ScanFace, color: '#3B82F6' },
-  'hostile-track': { label: 'Hostile Track', icon: Crosshair, color: '#EF4444' },
-  intrusion: { label: 'Intrusion', icon: ShieldAlert, color: '#F59E0B' },
-  'impossible-travel': { label: 'Impossible Travel', icon: Globe2, color: '#A855F7' },
-  correlation: { label: 'Cross-Source Correlation', icon: Share2, color: '#06B6D4' },
+const CATEGORY_META: Record<FindingCategory, { labelKey: TKey; icon: LucideIcon; color: string }> = {
+  'biometric-hit': { labelKey: 'threatIntel.catBiometricHit', icon: ScanFace, color: '#3B82F6' },
+  'hostile-track': { labelKey: 'threatIntel.catHostileTrack', icon: Crosshair, color: '#EF4444' },
+  intrusion: { labelKey: 'threatIntel.catIntrusion', icon: ShieldAlert, color: '#F59E0B' },
+  'impossible-travel': { labelKey: 'threatIntel.catImpossibleTravel', icon: Globe2, color: '#A855F7' },
+  correlation: { labelKey: 'threatIntel.catCrossSourceCorrelation', icon: Share2, color: '#06B6D4' },
 };
 
 const SEVERITY_STYLE: Record<Severity, string> = {
@@ -80,6 +82,7 @@ function threatLevelToSeverity(level: string): Severity {
 }
 
 export const ThreatIntel: React.FC = () => {
+  const t = useT();
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
   const { data: detections = [], isFetching: fetchingDetections, refetch: refetchDetections } = useQuery({
@@ -234,9 +237,9 @@ export const ThreatIntel: React.FC = () => {
     const counts = new Map<FindingCategory, number>();
     findings.forEach((f) => counts.set(f.category, (counts.get(f.category) ?? 0) + 1));
     return (Object.keys(CATEGORY_META) as FindingCategory[])
-      .map((cat) => ({ category: cat, label: CATEGORY_META[cat].label, count: counts.get(cat) ?? 0, color: CATEGORY_META[cat].color }))
+      .map((cat) => ({ category: cat, label: t(CATEGORY_META[cat].labelKey), count: counts.get(cat) ?? 0, color: CATEGORY_META[cat].color }))
       .filter((c) => c.count > 0);
-  }, [findings]);
+  }, [findings, t]);
 
   return (
     <div className="space-y-6">
@@ -245,11 +248,11 @@ export const ThreatIntel: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
             <Brain size={22} className="text-blue-400" />
-            AI Threat Intelligence
+            {t('threatIntel.title')}
             <span className="live-dot w-2 h-2 bg-blue-500 rounded-full" />
           </h1>
           <p className="text-gray-400 text-sm mt-1">
-            Fusion engine correlating sensor, military and SOC signals into a single ranked, scored findings feed.
+            {t('threatIntel.subtitle')}
           </p>
         </div>
         <button
@@ -257,17 +260,17 @@ export const ThreatIntel: React.FC = () => {
           className="flex items-center gap-2 px-3.5 py-2 bg-gray-900 border border-gray-800 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:border-gray-700 transition-all shrink-0"
         >
           <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} />
-          Refresh · {lastRefreshed.toLocaleTimeString()}
+          {t('threatIntel.refreshLabel')} {lastRefreshed.toLocaleTimeString()}
         </button>
       </div>
 
       {/* Stat tiles */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { name: 'Total Findings', value: stats.total, icon: Sparkles, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-          { name: 'Critical', value: stats.critical, icon: ShieldAlert, color: 'text-red-500', bg: 'bg-red-500/10' },
-          { name: 'Avg Risk Score', value: stats.avgScore, icon: Gauge, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-          { name: 'Active Correlations', value: stats.correlations, icon: Share2, color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+          { name: t('threatIntel.statTotalFindings'), value: stats.total, icon: Sparkles, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+          { name: t('threatIntel.statCritical'), value: stats.critical, icon: ShieldAlert, color: 'text-red-500', bg: 'bg-red-500/10' },
+          { name: t('threatIntel.statAvgRiskScore'), value: stats.avgScore, icon: Gauge, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+          { name: t('threatIntel.statActiveCorrelations'), value: stats.correlations, icon: Share2, color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
         ].map((tile) => {
           const Icon = tile.icon;
           return (
@@ -288,13 +291,13 @@ export const ThreatIntel: React.FC = () => {
           <div className="p-4 border-b border-gray-800 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <TrendingUp size={14} className="text-blue-400" /> Ranked AI Findings
+                <TrendingUp size={14} className="text-blue-400" /> {t('threatIntel.rankedFindings')}
               </h3>
-              <p className="text-xxs text-gray-500 mt-0.5">Sorted by computed risk score, highest first</p>
+              <p className="text-xxs text-gray-500 mt-0.5">{t('threatIntel.sortedHint')}</p>
             </div>
             {sensorStats && (
               <span className="text-xxs text-gray-500">
-                {sensorStats.detections_24h} detections / 24h · {sensorStats.identified_hits} identified
+                {sensorStats.detections_24h}{t('threatIntel.detectionsLabel')} {sensorStats.identified_hits} {t('threatIntel.identifiedLabel')}
               </span>
             )}
           </div>
@@ -316,10 +319,10 @@ export const ThreatIntel: React.FC = () => {
                         <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border shrink-0 ${SEVERITY_STYLE[f.severity]}`}>
                           {f.severity}
                         </span>
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">{meta.label}</span>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">{t(meta.labelKey)}</span>
                         {f.sourceCount > 1 && (
                           <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                            {f.sourceCount} sources
+                            {f.sourceCount} {t('threatIntel.sourcesSuffix')}
                           </span>
                         )}
                         <span className="text-xxs text-gray-600 ml-auto shrink-0">{new Date(f.timestamp).toLocaleString()}</span>
@@ -344,7 +347,7 @@ export const ThreatIntel: React.FC = () => {
               );
             })}
             {!loading && findings.length === 0 && (
-              <p className="text-xs text-gray-500 text-center py-10">No correlated findings — all monitored sources are nominal.</p>
+              <p className="text-xs text-gray-500 text-center py-10">{t('threatIntel.noFindings')}</p>
             )}
             {loading && findings.length === 0 && (
               <div className="p-4 space-y-3">
@@ -359,8 +362,8 @@ export const ThreatIntel: React.FC = () => {
         {/* Risk distribution */}
         <div className="glass rounded-2xl border border-gray-800 p-5">
           <div className="mb-3">
-            <h3 className="text-sm font-bold text-white">Risk Distribution by Category</h3>
-            <p className="text-xxs text-gray-500 mt-0.5">Finding count per correlation category</p>
+            <h3 className="text-sm font-bold text-white">{t('threatIntel.riskDistributionTitle')}</h3>
+            <p className="text-xxs text-gray-500 mt-0.5">{t('threatIntel.riskDistributionHint')}</p>
           </div>
           {categoryDistribution.length > 0 ? (
             <ResponsiveContainer width="100%" height={Math.max(180, categoryDistribution.length * 46)}>
@@ -387,7 +390,7 @@ export const ThreatIntel: React.FC = () => {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-xs text-gray-500 text-center py-10">No findings yet.</p>
+            <p className="text-xs text-gray-500 text-center py-10">{t('threatIntel.noFindingsYet')}</p>
           )}
 
           <div className="mt-4 pt-4 border-t border-gray-800 space-y-2">

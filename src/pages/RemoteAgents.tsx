@@ -3,6 +3,8 @@ import { Cpu, Terminal, Play, Circle } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { agentsApi } from '../api/agents';
 import type { Agent } from '../types';
+import { useT } from '../hooks/useT';
+import type { TKey } from '../lib/i18n';
 
 function statusTextClass(status: Agent['status']): string {
   if (status === 'online') return 'text-green-400';
@@ -16,16 +18,17 @@ function statusFillColor(status: Agent['status']): string {
   return '#EF4444';
 }
 
-function heartbeatAgo(iso: string): string {
+function heartbeatAgo(iso: string, t: (key: TKey) => string): string {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 60) return `${seconds}${t('time.secondsAgo')}`;
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return `${minutes}${t('time.minutesAgo')}`;
   const hours = Math.floor(minutes / 60);
-  return `${hours}h ago`;
+  return `${hours}${t('time.hoursAgo')}`;
 }
 
 export const RemoteAgents: React.FC = () => {
+  const t = useT();
   const queryClient = useQueryClient();
 
   const { data: agents = [] } = useQuery({
@@ -44,24 +47,24 @@ export const RemoteAgents: React.FC = () => {
       const now = new Date().toLocaleString();
       setLogs(prev => [
         ...prev,
-        `[${now}] Command [${variables.command.toUpperCase()}] dispatched by System Administrator.`,
-        `[${now}] HANDSHAKE: Agent acknowledged command code.`,
-        `[${now}] EXECUTION: Command status = ${result.status}.`,
+        `[${now}] ${t('remoteAgents.logCmdPrefix')}${variables.command.toUpperCase()}${t('remoteAgents.logCmdSuffix')}`,
+        `[${now}] ${t('remoteAgents.logHandshakeAck')}`,
+        `[${now}] ${t('remoteAgents.logExecutionPrefix')}${result.status}.`,
       ]);
       queryClient.invalidateQueries({ queryKey: ['agents', variables.agentId, 'commands'] });
-      alert(`Command [${variables.command.toUpperCase()}] successfully issued to Agent.`);
+      alert(`${t('remoteAgents.logCmdPrefix')}${variables.command.toUpperCase()}${t('remoteAgents.alertIssuedSuffix')}`);
     },
     onError: () => {
-      alert('Failed to dispatch command to agent.');
+      alert(t('remoteAgents.dispatchFailedAlert'));
     },
   });
 
   const handleSelectAgent = (agent: Agent) => {
     setSelectedAgentId(agent.id);
     setLogs([
-      `[${new Date().toLocaleString()}] HANDSHAKE: Handled by edge endpoint ${agent.location}`,
-      `[${new Date().toLocaleString()}] MTLS: TLS_AES_256_GCM_SHA384 handshake completed`,
-      `[${new Date().toLocaleString()}] TELEMETRY: Streaming packet payload size 24.2KB`,
+      `[${new Date().toLocaleString()}] ${t('remoteAgents.logHandshakeEndpointPrefix')}${agent.location}`,
+      `[${new Date().toLocaleString()}] ${t('remoteAgents.logMtlsHandshake')}`,
+      `[${new Date().toLocaleString()}] ${t('remoteAgents.logTelemetryPacket')}`,
     ]);
   };
 
@@ -77,9 +80,9 @@ export const RemoteAgents: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            Remote Agent Governance
+            {t('remoteAgents.title')}
           </h1>
-          <p className="text-gray-400 text-sm mt-1">Configure edge sensor daemons, telemetry collectors, and dispatch mTLS remote shell commands.</p>
+          <p className="text-gray-400 text-sm mt-1">{t('remoteAgents.subtitle')}</p>
         </div>
       </div>
 
@@ -115,7 +118,7 @@ export const RemoteAgents: React.FC = () => {
 
               <div className="pt-2 border-t border-gray-800/40 flex justify-between items-center text-xxs text-gray-500">
                 <span className="truncate max-w-[150px]">CPU {agent.cpuUsage}% • MEM {agent.memUsage}%</span>
-                <span>{heartbeatAgo(agent.lastHeartbeat)}</span>
+                <span>{heartbeatAgo(agent.lastHeartbeat, t)}</span>
               </div>
             </div>
           ))}
@@ -128,9 +131,9 @@ export const RemoteAgents: React.FC = () => {
               <div>
                 <h4 className="font-bold text-sm text-white flex items-center gap-2">
                   <Terminal size={14} className="text-blue-500" />
-                  Remote: {activeAgent.name}
+                  {t('remoteAgents.remoteLabel')} {activeAgent.name}
                 </h4>
-                <p className="text-xxs text-gray-500 mt-0.5">Firmware: {activeAgent.version} • Location: {activeAgent.location}</p>
+                <p className="text-xxs text-gray-500 mt-0.5">{t('remoteAgents.firmwareLabel')} {activeAgent.version} • {t('remoteAgents.locationLabel')} {activeAgent.location}</p>
 
                 {/* Dropdown & Dispatch command */}
                 <div className="flex gap-2 mt-4">
@@ -139,10 +142,10 @@ export const RemoteAgents: React.FC = () => {
                     onChange={e => setCmd(e.target.value)}
                     className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-xs text-gray-300 focus:outline-none"
                   >
-                    <option value="restart">Restart Edge Daemon</option>
-                    <option value="update">Update Firmware</option>
-                    <option value="collect">Force Sync Telemetry</option>
-                    <option value="stop">Stop Node Ingest</option>
+                    <option value="restart">{t('remoteAgents.cmdRestart')}</option>
+                    <option value="update">{t('remoteAgents.cmdUpdate')}</option>
+                    <option value="collect">{t('remoteAgents.cmdSync')}</option>
+                    <option value="stop">{t('remoteAgents.cmdStop')}</option>
                   </select>
                   <button
                     onClick={() => handleSendCommand(activeAgent.id)}
@@ -164,7 +167,7 @@ export const RemoteAgents: React.FC = () => {
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center text-gray-500 space-y-2">
               <Terminal size={32} />
-              <p className="text-xs">Select a remote agent to audit active connection handshake logs and dispatch console controls.</p>
+              <p className="text-xs">{t('remoteAgents.emptyState')}</p>
             </div>
           )}
         </div>

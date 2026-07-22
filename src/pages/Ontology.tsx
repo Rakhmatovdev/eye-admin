@@ -3,8 +3,10 @@ import { Layers, Plus, Link } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { entitiesApi } from '../api/entities';
 import type { EntityType } from '../types';
+import { useT } from '../hooks/useT';
 
 export const Ontology: React.FC = () => {
+  const t = useT();
   const queryClient = useQueryClient();
 
   const { data: entities = [], isLoading } = useQuery({
@@ -53,27 +55,27 @@ export const Ontology: React.FC = () => {
       {/* Title Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Ontology & Schema Manager</h1>
-          <p className="text-gray-400 text-sm mt-1">Define real-world entity models (nodes) and their semantic connections (edges).</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">{t('ontology.title')}</h1>
+          <p className="text-gray-400 text-sm mt-1">{t('ontology.subtitle')}</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
           className="btn-primary px-4 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2"
         >
           <Plus size={16} />
-          <span>New Entity Class</span>
+          <span>{t('ontology.newEntityClass')}</span>
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Side: Classes */}
         <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Entity Classes</h4>
+          <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">{t('ontology.entityClasses')}</h4>
           {isLoading && (
-            <div className="text-sm text-gray-500 p-4">Loading ontology…</div>
+            <div className="text-sm text-gray-500 p-4">{t('ontology.loadingOntology')}</div>
           )}
           {!isLoading && entities.length === 0 && (
-            <div className="text-sm text-gray-500 p-4">No entity classes found.</div>
+            <div className="text-sm text-gray-500 p-4">{t('ontology.noEntityClasses')}</div>
           )}
           {entities.map(ent => (
             <button
@@ -107,7 +109,7 @@ export const Ontology: React.FC = () => {
         <div className="lg:col-span-2 space-y-6">
           {/* Interactive SVG Diagram preview */}
           <div className="glass p-5 rounded-2xl border border-gray-800 relative h-48 flex items-center justify-center overflow-hidden">
-            <div className="absolute top-3 left-4 text-xxs font-bold text-gray-500 uppercase tracking-wider">Ontology Mapping View</div>
+            <div className="absolute top-3 left-4 text-xxs font-bold text-gray-500 uppercase tracking-wider">{t('ontology.mappingViewLabel')}</div>
 
             {/* Simple SVGs showing nodes and relationships, driven by the live entity classes */}
             <svg className="w-full h-full max-w-sm" viewBox="0 0 300 100">
@@ -132,17 +134,17 @@ export const Ontology: React.FC = () => {
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <span className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedNode.color }} />
-                  {selectedNode.name} Schema Definition
+                  {selectedNode.name} {t('ontology.schemaDefinitionSuffix')}
                 </h3>
                 <p className="text-xs text-gray-500 mt-1">{selectedNode.description}</p>
               </div>
 
               {/* Properties Table */}
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Properties</h4>
+                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('ontology.properties')}</h4>
                 <div className="bg-gray-950/40 border border-gray-800/60 rounded-xl overflow-hidden divide-y divide-gray-800/40">
                   {selectedNode.properties.length === 0 && (
-                    <div className="p-3.5 text-xs text-gray-500">No observed properties yet.</div>
+                    <div className="p-3.5 text-xs text-gray-500">{t('ontology.noPropertiesYet')}</div>
                   )}
                   {selectedNode.properties.map((prop, idx) => (
                     <div key={idx} className="flex items-center justify-between p-3.5 text-xs">
@@ -153,7 +155,7 @@ export const Ontology: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-0.5 rounded bg-gray-800 text-gray-400 text-xxs uppercase">{prop.type}</span>
                         {prop.required && (
-                          <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 text-xxs font-bold">Required</span>
+                          <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 text-xxs font-bold">{t('ontology.required')}</span>
                         )}
                       </div>
                     </div>
@@ -163,10 +165,10 @@ export const Ontology: React.FC = () => {
 
               {/* Semantic Relationships */}
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Semantic Connections (Edges)</h4>
+                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('ontology.semanticConnections')}</h4>
                 <div className="bg-gray-950/40 border border-gray-800/60 rounded-xl overflow-hidden divide-y divide-gray-800/40">
                   {selectedNode.relationships.length === 0 && (
-                    <div className="p-3.5 text-xs text-gray-500">No relationships mapped yet.</div>
+                    <div className="p-3.5 text-xs text-gray-500">{t('ontology.noRelationshipsYet')}</div>
                   )}
                   {selectedNode.relationships.map((rel, idx) => (
                     <div key={idx} className="flex items-center justify-between p-3.5 text-xs">
@@ -175,7 +177,7 @@ export const Ontology: React.FC = () => {
                         <span className="font-bold text-gray-200">{rel.name}</span>
                       </div>
                       <div className="flex items-center gap-4">
-                        <span className="text-gray-500 uppercase text-xxs">Target: {rel.targetType}</span>
+                        <span className="text-gray-500 uppercase text-xxs">{t('ontology.targetLabel')} {rel.targetType}</span>
                         <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-xxs font-semibold">{rel.cardinality}</span>
                       </div>
                     </div>
@@ -192,34 +194,34 @@ export const Ontology: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
           <div className="glass w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-gray-800">
             <div className="p-6 border-b border-gray-800 bg-gray-950/50">
-              <h3 className="text-lg font-bold text-white">Define New Entity Class</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Register a new ontology node type for the graph schema.</p>
+              <h3 className="text-lg font-bold text-white">{t('ontology.modalTitle')}</h3>
+              <p className="text-xs text-gray-500 mt-0.5">{t('ontology.modalSubtitle')}</p>
             </div>
             <form onSubmit={handleCreateEntity} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">Class Name</label>
+                <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">{t('ontology.className')}</label>
                 <input
                   type="text"
                   required
                   value={newName}
                   onChange={e => setNewName(e.target.value)}
                   className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-blue-500"
-                  placeholder="e.g. Vehicle"
+                  placeholder={t('ontology.classNamePlaceholder')}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">Description</label>
+                <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">{t('ontology.description')}</label>
                 <input
                   type="text"
                   required
                   value={newDescription}
                   onChange={e => setNewDescription(e.target.value)}
                   className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-blue-500"
-                  placeholder="Short description of this entity class..."
+                  placeholder={t('ontology.descriptionPlaceholder')}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">Accent Color</label>
+                <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5">{t('ontology.accentColor')}</label>
                 <input
                   type="color"
                   value={newColor}
@@ -234,14 +236,14 @@ export const Ontology: React.FC = () => {
                   onClick={() => setShowCreateModal(false)}
                   className="px-4 py-2 border border-gray-800 rounded-xl text-sm font-semibold text-gray-400 hover:bg-gray-800/30 transition-all"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={createMutation.isPending}
                   className="btn-primary px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
                 >
-                  {createMutation.isPending ? 'Creating…' : 'Create Entity Class'}
+                  {createMutation.isPending ? t('ontology.creating') : t('ontology.createEntityClass')}
                 </button>
               </div>
             </form>

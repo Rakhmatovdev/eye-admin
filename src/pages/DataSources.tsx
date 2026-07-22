@@ -3,22 +3,25 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Database, Plus, RefreshCw, CheckCircle, AlertCircle, XCircle, Play } from 'lucide-react';
 import { monitoringApi } from '../api/monitoring';
 import type { DataSource } from '../types';
+import { useT } from '../hooks/useT';
+import type { TKey } from '../lib/i18n';
 
 function formatRecords(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
 }
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, t: (key: TKey) => string): string {
   const s = Math.floor((Date.now() - +new Date(iso)) / 1000);
-  if (s < 5) return 'Active now';
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
+  if (s < 5) return t('dataSources.activeNow');
+  if (s < 60) return `${s}${t('time.secondsAgo')}`;
+  if (s < 3600) return `${Math.floor(s / 60)}${t('time.minutesAgo')}`;
+  if (s < 86400) return `${Math.floor(s / 3600)}${t('time.hoursAgo')}`;
+  return `${Math.floor(s / 86400)}${t('time.daysAgo')}`;
 }
 
 export const DataSources: React.FC = () => {
+  const t = useT();
   const qc = useQueryClient();
   const { data: sources = [] } = useQuery({ queryKey: ['data-sources'], queryFn: monitoringApi.getDataSources });
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -37,12 +40,12 @@ export const DataSources: React.FC = () => {
       {/* Title Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Data Integrations</h1>
-          <p className="text-gray-400 text-sm mt-1">Connected datastores, sensor feeds and streaming pipelines wired into the core ontology.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">{t('dataSources.title')}</h1>
+          <p className="text-gray-400 text-sm mt-1">{t('dataSources.subtitle')}</p>
         </div>
         <button className="btn-primary px-4 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2">
           <Plus size={16} />
-          <span>Connect Source</span>
+          <span>{t('dataSources.connectSource')}</span>
         </button>
       </div>
 
@@ -58,7 +61,7 @@ export const DataSources: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="font-bold text-base text-white">{source.name}</h4>
-                  <p className="text-xxs text-gray-500 uppercase font-semibold">Type: {source.type}</p>
+                  <p className="text-xxs text-gray-500 uppercase font-semibold">{t('dataSources.typeLabel')} {source.type}</p>
                 </div>
               </div>
 
@@ -81,26 +84,26 @@ export const DataSources: React.FC = () => {
             {/* Details */}
             <div className="grid grid-cols-2 gap-4 text-xs bg-gray-950/40 p-4 border border-gray-800/40 rounded-xl">
               <div>
-                <p className="text-gray-500 font-semibold uppercase tracking-wider text-xxs">Endpoint / Host</p>
+                <p className="text-gray-500 font-semibold uppercase tracking-wider text-xxs">{t('dataSources.endpointHost')}</p>
                 <p className="text-gray-300 font-medium truncate mt-0.5">{source.host}</p>
               </div>
               <div>
-                <p className="text-gray-500 font-semibold uppercase tracking-wider text-xxs">Resource Target</p>
+                <p className="text-gray-500 font-semibold uppercase tracking-wider text-xxs">{t('dataSources.resourceTarget')}</p>
                 <p className="text-gray-300 font-medium truncate mt-0.5">{source.database || '—'}</p>
               </div>
               <div>
-                <p className="text-gray-500 font-semibold uppercase tracking-wider text-xxs">Total Records</p>
+                <p className="text-gray-500 font-semibold uppercase tracking-wider text-xxs">{t('dataSources.totalRecords')}</p>
                 <p className="text-gray-300 font-medium mt-0.5">{formatRecords(source.recordCount)}</p>
               </div>
               <div>
-                <p className="text-gray-500 font-semibold uppercase tracking-wider text-xxs">Last Synced</p>
-                <p className="text-gray-300 font-medium mt-0.5">{timeAgo(source.lastSync)}</p>
+                <p className="text-gray-500 font-semibold uppercase tracking-wider text-xxs">{t('dataSources.lastSynced')}</p>
+                <p className="text-gray-300 font-medium mt-0.5">{timeAgo(source.lastSync, t)}</p>
               </div>
             </div>
 
             {source.errorMessage && (
               <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-xl text-xxs text-red-400 font-medium">
-                Warning: {source.errorMessage}
+                {t('dataSources.warningLabel')} {source.errorMessage}
               </div>
             )}
 
@@ -121,11 +124,11 @@ export const DataSources: React.FC = () => {
                 className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-800 hover:border-gray-700 rounded-lg text-xs font-semibold text-gray-400 hover:text-gray-200 transition-all disabled:opacity-50"
               >
                 <RefreshCw size={12} className={syncingId === source.id ? 'animate-spin' : ''} />
-                <span>{syncingId === source.id ? 'Syncing...' : 'Sync Now'}</span>
+                <span>{syncingId === source.id ? t('dataSources.syncing') : t('dataSources.syncNow')}</span>
               </button>
               <button className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 border border-blue-500/20 hover:bg-blue-600/20 text-blue-400 rounded-lg text-xs font-semibold transition-all">
                 <Play size={12} />
-                <span>Inspect Pipeline</span>
+                <span>{t('dataSources.inspectPipeline')}</span>
               </button>
             </div>
           </div>
