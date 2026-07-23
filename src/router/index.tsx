@@ -18,6 +18,8 @@ import { Surveillance } from '../pages/Surveillance';
 import { Command } from '../pages/Command';
 import { ThreatIntel } from '../pages/ThreatIntel';
 import { Settings } from '../pages/Settings';
+import { AlertCenter } from '../pages/AlertCenter';
+import { Patterns } from '../pages/Patterns';
 
 export const router = createBrowserRouter([
   {
@@ -95,6 +97,14 @@ export const router = createBrowserRouter([
       {
         path: 'settings',
         element: <Settings />,
+      },
+      {
+        path: 'alert-center',
+        element: <AlertCenter />,
+      },
+      {
+        path: 'patterns',
+        element: <Patterns />,
       },
     ],
   },

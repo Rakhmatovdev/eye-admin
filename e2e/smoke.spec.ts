@@ -3,6 +3,8 @@ import path from 'path';
 
 const SCREENSHOT_DIR =
   'C:\\Users\\user\\AppData\\Local\\Temp\\claude\\C--Users-user-Desktop-ko-z\\e71fd394-e8e5-4b2e-bed4-f6750213acb5\\scratchpad\\admin-e2e-screens';
+const WAVE2_SCREENSHOT_DIR =
+  'C:\\Users\\user\\AppData\\Local\\Temp\\claude\\C--Users-user-Desktop-ko-z\\e71fd394-e8e5-4b2e-bed4-f6750213acb5\\scratchpad\\wave2-admin-screens';
 
 async function login(page: Page) {
   await page.goto('/login');
@@ -96,6 +98,83 @@ test.describe('Admin panel smoke suite', () => {
 
     await page.screenshot({
       path: path.join(SCREENSHOT_DIR, 'monitoring.png'),
+      fullPage: true,
+    });
+  });
+
+  test('alert center: alerts tab renders seeded + evaluator-generated rows', async ({ page }) => {
+    await login(page);
+
+    await page.goto('/alert-center');
+    await page.waitForURL('**/alert-center');
+
+    const rows = page.locator('table tbody tr.table-row-hover');
+    await expect
+      .poll(async () => rows.count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(3);
+
+    // Seed guarantees a mix of severities — the uppercase severity badge
+    // text (critical/high/medium/low) is locale-independent, unlike the
+    // rest of the row chrome which is translated (default locale is uz).
+    const bodyText = await page.locator('table tbody').innerText();
+    expect(bodyText.toLowerCase()).toMatch(/critical|high|medium|low/);
+
+    await page.screenshot({
+      path: path.join(WAVE2_SCREENSHOT_DIR, 'alert-center-alerts.png'),
+      fullPage: true,
+    });
+  });
+
+  test('alert center: rules tab shows the 3 seeded alert rules', async ({ page }) => {
+    await login(page);
+
+    await page.goto('/alert-center');
+    await page.waitForURL('**/alert-center');
+    await page.getByTestId('alert-center-tab-rules').click();
+
+    const rows = page.locator('table tbody tr.table-row-hover');
+    await expect
+      .poll(async () => rows.count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(3);
+
+    const bodyText = await page.locator('table tbody').innerText();
+    expect(bodyText).toMatch(/Watchlist Sensor Hit/i);
+    expect(bodyText).toMatch(/Hostile Threat Classification/i);
+    expect(bodyText).toMatch(/High Risk Entity/i);
+
+    await page.screenshot({
+      path: path.join(WAVE2_SCREENSHOT_DIR, 'alert-center-rules.png'),
+      fullPage: true,
+    });
+  });
+
+  test('alert center: watchlist tab shows the 2 seeded entries', async ({ page }) => {
+    await login(page);
+
+    await page.goto('/alert-center');
+    await page.waitForURL('**/alert-center');
+    await page.getByTestId('alert-center-tab-watchlist').click();
+
+    const rows = page.locator('table tbody tr.table-row-hover');
+    await expect
+      .poll(async () => rows.count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(2);
+  });
+
+  test('AI patterns page renders at least one detected pattern', async ({ page }) => {
+    await login(page);
+
+    await page.goto('/patterns');
+    await page.waitForURL('**/patterns');
+
+    // Pattern cards carry the shared card-hover class used across the admin UI.
+    const cards = page.locator('.card-hover');
+    await expect
+      .poll(async () => cards.count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(1);
+
+    await page.screenshot({
+      path: path.join(WAVE2_SCREENSHOT_DIR, 'patterns.png'),
       fullPage: true,
     });
   });

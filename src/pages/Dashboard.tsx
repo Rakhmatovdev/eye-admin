@@ -25,7 +25,13 @@ import { sensorsApi } from '../api/sensors';
 import { militaryApi } from '../api/military';
 import { usersApi } from '../api/users';
 import { entitiesApi } from '../api/entities';
+import { alertsApi, type AlertSeverity } from '../api/alerts';
+import { useLiveAlerts } from '../hooks/useLiveAlerts';
 import { useT } from '../hooks/useT';
+
+const ALERT_SEVERITY_DOT: Record<AlertSeverity, string> = {
+  critical: 'bg-red-500', high: 'bg-orange-500', medium: 'bg-amber-500', low: 'bg-blue-500',
+};
 
 export const Dashboard: React.FC = () => {
   const t = useT();
@@ -34,6 +40,16 @@ export const Dashboard: React.FC = () => {
   const { data: milStats } = useQuery({ queryKey: ['dash-mil'], queryFn: militaryApi.stats });
   const { data: users } = useQuery({ queryKey: ['dash-users'], queryFn: () => usersApi.getUsers() });
   const { data: entityTypes } = useQuery({ queryKey: ['dash-types'], queryFn: entitiesApi.getEntityTypes });
+  const { data: recentAlertsPage } = useQuery({ queryKey: ['dash-alerts'], queryFn: () => alertsApi.list({ limit: 5 }) });
+  const { alerts: liveAlerts, status: liveAlertsStatus } = useLiveAlerts(5);
+
+  // Merge WS-pushed alerts (newest first) with the initial REST page, deduping
+  // by id so a live frame that arrives just before the query resolves doesn't
+  // show up twice.
+  const recentAlerts = [
+    ...liveAlerts,
+    ...(recentAlertsPage?.items ?? []).filter((a) => !liveAlerts.some((la) => la.id === a.id)),
+  ].slice(0, 5);
 
   const stats = [
     { name: t('dashboard.statTotalUsers'), value: users ? String(users.length) : '—', icon: Users, trend: 'live', up: true, color: 'text-blue-500', bg: 'bg-blue-500/10' },
@@ -166,7 +182,27 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Underworld / Lower Sections */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {/* Recent live alerts */}
+        <div className="glass p-5 rounded-2xl border border-gray-800">
+          <h4 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+            {t('dashboard.liveAlertsTitle')}
+            <span className={`w-2 h-2 rounded-full ${liveAlertsStatus === 'live' ? 'live-dot bg-green-500' : 'bg-gray-600'}`} title={liveAlertsStatus} />
+          </h4>
+          <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+            {recentAlerts.map((a) => (
+              <div key={a.id} className="flex items-start gap-2.5 text-sm">
+                <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${ALERT_SEVERITY_DOT[a.severity]}`} />
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-200 truncate">{a.title}</p>
+                  <p className="text-xxs text-gray-500 truncate">{a.rule_name} &middot; {new Date(a.created_at).toLocaleTimeString()}</p>
+                </div>
+              </div>
+            ))}
+            {recentAlerts.length === 0 && <p className="text-xs text-gray-600 text-center py-6">{t('dashboard.noLiveAlerts')}</p>}
+          </div>
+        </div>
+
         {/* Recent Incidents */}
         <div className="glass p-5 rounded-2xl border border-gray-800">
           <h4 className="text-base font-bold text-white mb-4 flex items-center gap-2">

@@ -14,6 +14,8 @@ import {
   Cctv,
   Crosshair,
   Brain,
+  Bell,
+  Sparkles,
   Settings as SettingsIcon
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
@@ -42,6 +44,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => 
     { name: t('nav.remoteAgents'), path: '/remote-agents', icon: Cpu },
     { name: t('nav.security'), path: '/security', icon: ShieldAlert },
     { name: t('nav.threatIntel'), path: '/threat-intel', icon: Brain },
+    { name: t('nav.alertCenter'), path: '/alert-center', icon: Bell },
+    { name: t('nav.patterns'), path: '/patterns', icon: Sparkles },
     { name: t('nav.settings'), path: '/settings', icon: SettingsIcon },
   ];
 
